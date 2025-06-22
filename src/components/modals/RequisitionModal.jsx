@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { X, Plus, Trash2, Package, DollarSign, Calendar, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, Package, DollarSign, Calendar, AlertCircle, Building } from 'lucide-react';
 
 const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -26,6 +26,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
   const [inventory, setInventory] = useState([]);
   const [units, setUnits] = useState([]);
   const [workflows, setWorkflows] = useState([]);
+  const [departments, setDepartments] = useState([]);
 
   useEffect(() => {
     fetchDropdownData();
@@ -48,14 +49,16 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
 
   const fetchDropdownData = async () => {
     try {
-      const [inventoryRes, unitsRes, workflowsRes] = await Promise.all([
+      const [inventoryRes, unitsRes, workflowsRes, departmentsRes] = await Promise.all([
         axios.get('/api/inventory'),
         axios.get('/api/units'),
-        axios.get('/api/workflows').catch(() => ({ data: [] })) // Graceful fallback
+        axios.get('/api/workflows').catch(() => ({ data: [] })), // Graceful fallback
+        axios.get('/api/departments').catch(() => ({ data: [] })) // Graceful fallback
       ]);
 
       setInventory(inventoryRes.data);
       setUnits(unitsRes.data);
+      setDepartments(departmentsRes.data);
       
       // Use workflows from API or fallback to static ones
       if (workflowsRes.data && workflowsRes.data.length > 0) {
@@ -262,16 +265,25 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Building className="h-4 w-4 inline mr-1" />
                     Department
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="department"
-                    className="form-input"
+                    className="form-select"
                     value={formData.department}
                     onChange={handleChange}
-                    placeholder="Enter department"
-                  />
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.name}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select the requesting department
+                  </p>
                 </div>
 
                 <div>

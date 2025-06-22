@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { X, Edit, Trash2, FolderTree, Ruler, MapPin, Truck, Mail, Phone, Plus, Folder, ArrowRightLeft } from 'lucide-react';
+import { X, Edit, Trash2, FolderTree, Ruler, MapPin, Truck, Mail, Phone, Plus, Folder, ArrowRightLeft, Building } from 'lucide-react';
 import CategoryModal from './CategoryModal';
 import UnitModal from './UnitModal';
 import LocationModal from './LocationModal';
 import SupplierModal from './SupplierModal';
+import DepartmentManagementModal from './DepartmentManagementModal';
 import ConfirmationModal from './ConfirmationModal';
 import { useConfirmation } from '../../hooks/useConfirmation';
 
@@ -13,6 +14,7 @@ const ManagementModal = ({ categories, units, locations, suppliers, onClose, onS
   const [activeTab, setActiveTab] = useState('categories');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddSubcategoryModal, setShowAddSubcategoryModal] = useState(false);
+  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [editModalType, setEditModalType] = useState('');
   const { confirmationState, showConfirmation, hideConfirmation } = useConfirmation();
@@ -22,6 +24,7 @@ const ManagementModal = ({ categories, units, locations, suppliers, onClose, onS
     { id: 'units', label: 'Units', icon: Ruler },
     { id: 'locations', label: 'Locations', icon: MapPin },
     { id: 'suppliers', label: 'Suppliers', icon: Truck },
+    { id: 'departments', label: 'Departments', icon: Building },
   ];
 
   const handleEdit = (item, type) => {
@@ -57,6 +60,10 @@ const ManagementModal = ({ categories, units, locations, suppliers, onClose, onS
     setShowAddSubcategoryModal(true);
   };
 
+  const handleManageDepartments = () => {
+    setShowDepartmentModal(true);
+  };
+
   const handleEditModalSuccess = () => {
     setShowEditModal(false);
     setEditingItem(null);
@@ -67,6 +74,12 @@ const ManagementModal = ({ categories, units, locations, suppliers, onClose, onS
 
   const handleAddSubcategorySuccess = () => {
     setShowAddSubcategoryModal(false);
+    // Refresh data but keep the main modal open
+    onSuccess();
+  };
+
+  const handleDepartmentModalSuccess = () => {
+    setShowDepartmentModal(false);
     // Refresh data but keep the main modal open
     onSuccess();
   };
@@ -335,6 +348,23 @@ const ManagementModal = ({ categories, units, locations, suppliers, onClose, onS
     </div>
   );
 
+  const renderDepartments = () => (
+    <div className="text-center py-12">
+      <Building className="mx-auto h-12 w-12 text-gray-400" />
+      <h3 className="mt-2 text-sm font-medium text-gray-900">Department Management</h3>
+      <p className="mt-1 text-sm text-gray-500 mb-4">
+        Manage organizational departments for requisitions
+      </p>
+      <button
+        onClick={handleManageDepartments}
+        className="btn-primary flex items-center mx-auto"
+      >
+        <Building className="h-4 w-4 mr-2" />
+        Manage Departments
+      </button>
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeTab) {
       case 'categories':
@@ -345,6 +375,8 @@ const ManagementModal = ({ categories, units, locations, suppliers, onClose, onS
         return renderLocations();
       case 'suppliers':
         return renderSuppliers();
+      case 'departments':
+        return renderDepartments();
       default:
         return null;
     }
@@ -451,6 +483,14 @@ const ManagementModal = ({ categories, units, locations, suppliers, onClose, onS
           isSubcategory={true}
           onClose={() => setShowAddSubcategoryModal(false)}
           onSuccess={handleAddSubcategorySuccess}
+        />
+      )}
+
+      {/* Department Management Modal */}
+      {showDepartmentModal && (
+        <DepartmentManagementModal
+          onClose={() => setShowDepartmentModal(false)}
+          onSuccess={handleDepartmentModalSuccess}
         />
       )}
     </>

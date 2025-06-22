@@ -145,7 +145,8 @@ class DatabaseMigrator {
       'user_activity',
       'purchase_history',
       'inventory_movements',
-      'schema_migrations'
+      'schema_migrations',
+      'departments'
     ];
 
     // Remove CREATE TABLE statements for managed tables
@@ -341,6 +342,19 @@ class DatabaseMigrator {
       )
     `);
 
+    // Departments table
+    await this.createTableIfNotExists('departments', `
+      CREATE TABLE departments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
+        manager_name TEXT,
+        budget DECIMAL(12,2) DEFAULT 0,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Inventory table
     await this.createTableIfNotExists('inventory', `
       CREATE TABLE inventory (
@@ -469,7 +483,9 @@ class DatabaseMigrator {
       { name: 'idx_purchase_history_date', sql: 'CREATE INDEX idx_purchase_history_date ON purchase_history(purchase_date)' },
       { name: 'idx_movements_inventory_id', sql: 'CREATE INDEX idx_movements_inventory_id ON inventory_movements(inventory_id)' },
       { name: 'idx_movements_type', sql: 'CREATE INDEX idx_movements_type ON inventory_movements(movement_type)' },
-      { name: 'idx_movements_date', sql: 'CREATE INDEX idx_movements_date ON inventory_movements(created_at)' }
+      { name: 'idx_movements_date', sql: 'CREATE INDEX idx_movements_date ON inventory_movements(created_at)' },
+      { name: 'idx_departments_name', sql: 'CREATE INDEX idx_departments_name ON departments(name)' },
+      { name: 'idx_departments_active', sql: 'CREATE INDEX idx_departments_active ON departments(is_active)' }
     ];
 
     for (const index of indexes) {

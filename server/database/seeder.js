@@ -15,6 +15,7 @@ class DatabaseSeeder {
       await this.seedUnits();
       await this.seedLocations();
       await this.seedSuppliers();
+      await this.seedDepartments();
       await this.seedSampleInventory(); // Add sample inventory
       
       console.log('✅ Initial data seeded successfully');
@@ -201,6 +202,44 @@ class DatabaseSeeder {
             completed++;
             if (completed === total) {
               console.log('🚚 Suppliers seeded');
+              resolve();
+            }
+          }
+        );
+      });
+    });
+  }
+
+  async seedDepartments() {
+    return new Promise((resolve, reject) => {
+      const departments = [
+        ['Information Technology', 'Manages IT infrastructure and software systems', 'John Smith', 150000],
+        ['Human Resources', 'Employee management and organizational development', 'Sarah Johnson', 75000],
+        ['Finance & Accounting', 'Financial planning and accounting operations', 'Michael Brown', 100000],
+        ['Operations', 'Daily operations and logistics management', 'Emily Davis', 200000],
+        ['Marketing', 'Brand promotion and customer engagement', 'David Wilson', 80000],
+        ['Procurement', 'Purchasing and vendor management', 'Lisa Anderson', 120000],
+        ['Maintenance', 'Facility and equipment maintenance', 'Robert Taylor', 90000],
+        ['Quality Assurance', 'Quality control and compliance', 'Jennifer Martinez', 85000],
+        ['Research & Development', 'Product development and innovation', 'Christopher Lee', 180000],
+        ['Customer Service', 'Customer support and relations', 'Amanda White', 60000]
+      ];
+
+      let completed = 0;
+      const total = departments.length;
+
+      departments.forEach(([name, description, manager_name, budget]) => {
+        this.db.run(`INSERT OR IGNORE INTO departments (name, description, manager_name, budget, is_active) 
+                     VALUES (?, ?, ?, ?, ?)`,
+          [name, description, manager_name, budget, 1],
+          (err) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+            completed++;
+            if (completed === total) {
+              console.log('🏢 Departments seeded');
               resolve();
             }
           }

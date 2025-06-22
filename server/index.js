@@ -19,6 +19,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import databaseRoutes from './routes/database.js';
 import requisitionRoutes from './routes/requisitions.js';
 import workflowRoutes from './routes/workflows.js';
+import departmentRoutes from './routes/departments.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,6 +88,7 @@ app.use('/api/dashboard', authenticateToken, dashboardRoutes);
 app.use('/api/database', authenticateToken, databaseRoutes);
 app.use('/api/requisitions', authenticateToken, requisitionRoutes);
 app.use('/api/workflows', authenticateToken, workflowRoutes);
+app.use('/api/departments', authenticateToken, departmentRoutes);
 
 // Serve React app for all non-API routes (SPA fallback)
 app.get('*', (req, res) => {
