@@ -17,7 +17,6 @@ import locationRoutes from './routes/locations.js';
 import supplierRoutes from './routes/suppliers.js';
 import dashboardRoutes from './routes/dashboard.js';
 import databaseRoutes from './routes/database.js';
-import importExportRoutes from './routes/import-export.js';
 import requisitionRoutes from './routes/requisitions.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -86,7 +85,6 @@ app.use('/api/suppliers', authenticateToken, supplierRoutes);
 app.use('/api/dashboard', authenticateToken, dashboardRoutes);
 app.use('/api/database', authenticateToken, databaseRoutes);
 app.use('/api/requisitions', authenticateToken, requisitionRoutes);
-app.use('/api', authenticateToken, importExportRoutes);
 
 // Serve React app for all non-API routes (SPA fallback)
 app.get('*', (req, res) => {
