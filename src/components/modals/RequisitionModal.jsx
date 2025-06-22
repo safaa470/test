@@ -59,7 +59,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         axios.get('/api/departments').catch(() => ({ data: [] })) // Graceful fallback
       ]);
 
-      console.log('Inventory data:', inventoryRes.data); // Debug log
+      console.log('Inventory data loaded:', inventoryRes.data); // Debug log
       setInventory(inventoryRes.data);
       setUnits(unitsRes.data);
       setDepartments(departmentsRes.data);
@@ -284,6 +284,19 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     return 'bg-green-100 text-green-800';
   };
 
+  const formatInventoryOption = (invItem) => {
+    const stock = invItem.quantity || 0;
+    let stockText = `Stock: ${stock}`;
+    
+    if (stock === 0) {
+      stockText += ' [OUT OF STOCK]';
+    } else if (stock <= 10) {
+      stockText += ' [LOW STOCK]';
+    }
+    
+    return `${invItem.name} (${invItem.sku}) - ${stockText}`;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
@@ -470,21 +483,32 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                             <option value="">Select from inventory (optional)</option>
                             {inventory.map(invItem => (
                               <option key={invItem.id} value={invItem.id}>
-                                {invItem.name} ({invItem.sku}) - Stock: {invItem.quantity || 0}
-                                {invItem.quantity === 0 && ' [OUT OF STOCK]'}
-                                {invItem.quantity > 0 && invItem.quantity <= 10 && ' [LOW STOCK]'}
+                                {formatInventoryOption(invItem)}
                               </option>
                             ))}
                           </select>
                           {item.inventory_id && (
-                            <div className="mt-1">
+                            <div className="mt-2">
                               {(() => {
                                 const selectedItem = inventory.find(inv => inv.id == item.inventory_id);
                                 if (selectedItem) {
+                                  const stock = selectedItem.quantity || 0;
                                   return (
-                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockBadgeColor(selectedItem.quantity)}`}>
-                                      Stock: {selectedItem.quantity || 0} {selectedItem.base_unit_abbr || 'units'}
-                                    </span>
+                                    <div className="space-y-1">
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockBadgeColor(stock)}`}>
+                                        Current Stock: {stock} {selectedItem.base_unit_abbr || 'units'}
+                                      </span>
+                                      {stock === 0 && (
+                                        <div className="text-xs text-red-600 font-medium">
+                                          ⚠️ Out of Stock - Will create purchase order
+                                        </div>
+                                      )}
+                                      {stock > 0 && stock <= 10 && (
+                                        <div className="text-xs text-yellow-600 font-medium">
+                                          ⚠️ Low Stock Warning
+                                        </div>
+                                      )}
+                                    </div>
                                   );
                                 }
                                 return null;
