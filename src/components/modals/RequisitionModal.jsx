@@ -48,15 +48,14 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
 
   const fetchDropdownData = async () => {
     try {
-      const [inventoryRes, unitsRes, workflowsRes] = await Promise.all([
+      const [inventoryRes, unitsRes] = await Promise.all([
         axios.get('/api/inventory'),
-        axios.get('/api/units'),
-        axios.get('/api/workflows') // We'll need to create this endpoint
+        axios.get('/api/units')
       ]);
 
       setInventory(inventoryRes.data);
       setUnits(unitsRes.data);
-      // For now, use static workflows
+      // Use static workflows
       setWorkflows([
         { id: 1, name: 'Standard Approval' },
         { id: 2, name: 'High Value Approval' },
