@@ -5,6 +5,7 @@ import {
   Package, 
   LayoutDashboard,
   Users,
+  FileText,
   ChevronRight
 } from 'lucide-react';
 
@@ -14,6 +15,7 @@ const Sidebar = () => {
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/inventory', icon: Package, label: 'Inventory' },
+    { to: '/requisitions', icon: FileText, label: 'Requisitions' },
   ];
 
   // Add admin-only routes

@@ -6,6 +6,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Layout from './components/Layout';
 import Inventory from './components/Inventory';
+import Requisitions from './components/Requisitions';
 import UserManagement from './components/UserManagement';
 
 function ProtectedRoute({ children }) {
@@ -62,6 +63,7 @@ function App() {
             >
               <Route index element={<Dashboard />} />
               <Route path="inventory" element={<Inventory />} />
+              <Route path="requisitions" element={<Requisitions />} />
               <Route 
                 path="users" 
                 element={
