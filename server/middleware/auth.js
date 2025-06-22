@@ -13,15 +13,16 @@ export const authenticateToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
-    next();
+    next(); // Ensure next() is called on successful authentication
   } catch (error) {
-    res.status(400).json({ error: 'Invalid token.' });
+    console.error('JWT verification error:', error.message);
+    return res.status(401).json({ error: 'Invalid or expired token.' });
   }
 };
 
 // Admin middleware
 export const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Access denied. Admin only.' });
   }
   next();
