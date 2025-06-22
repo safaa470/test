@@ -48,21 +48,34 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
 
   const fetchDropdownData = async () => {
     try {
-      const [inventoryRes, unitsRes] = await Promise.all([
+      const [inventoryRes, unitsRes, workflowsRes] = await Promise.all([
         axios.get('/api/inventory'),
-        axios.get('/api/units')
+        axios.get('/api/units'),
+        axios.get('/api/workflows').catch(() => ({ data: [] })) // Graceful fallback
       ]);
 
       setInventory(inventoryRes.data);
       setUnits(unitsRes.data);
-      // Use static workflows
+      
+      // Use workflows from API or fallback to static ones
+      if (workflowsRes.data && workflowsRes.data.length > 0) {
+        setWorkflows(workflowsRes.data);
+      } else {
+        // Fallback to static workflows if API fails
+        setWorkflows([
+          { id: 1, name: 'Standard Approval' },
+          { id: 2, name: 'High Value Approval' },
+          { id: 3, name: 'Emergency Approval' }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+      // Set fallback data
       setWorkflows([
         { id: 1, name: 'Standard Approval' },
         { id: 2, name: 'High Value Approval' },
         { id: 3, name: 'Emergency Approval' }
       ]);
-    } catch (error) {
-      console.error('Error fetching dropdown data:', error);
     }
   };
 
