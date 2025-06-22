@@ -13,12 +13,17 @@ import {
   XCircle,
   AlertTriangle,
   ArrowRight,
-  MessageSquare
+  MessageSquare,
+  Send,
+  ShoppingCart
 } from 'lucide-react';
 
 const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [issuing, setIssuing] = useState(false);
+  const [showIssueForm, setShowIssueForm] = useState(false);
+  const [issueQuantities, setIssueQuantities] = useState({});
 
   useEffect(() => {
     if (requisition) {
@@ -30,11 +35,55 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
     try {
       const response = await axios.get(`/api/requisitions/${requisition.id}`);
       setDetails(response.data);
+      
+      // Initialize issue quantities with requested quantities
+      const initialQuantities = {};
+      response.data.items.forEach(item => {
+        initialQuantities[item.id] = item.quantity_requested - (item.quantity_fulfilled || 0);
+      });
+      setIssueQuantities(initialQuantities);
     } catch (error) {
       toast.error('Error fetching requisition details');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleIssueItems = async (issueType = 'full') => {
+    setIssuing(true);
+    
+    try {
+      const issueData = {
+        issue_type: issueType,
+        items: details.items.map(item => ({
+          id: item.id,
+          quantity_to_issue: issueType === 'full' 
+            ? item.quantity_requested - (item.quantity_fulfilled || 0)
+            : issueQuantities[item.id] || 0
+        })).filter(item => item.quantity_to_issue > 0)
+      };
+
+      await axios.post(`/api/requisitions/${requisition.id}/issue`, issueData);
+      
+      toast.success(`Items ${issueType === 'full' ? 'fully' : 'partially'} issued successfully`);
+      fetchRequisitionDetails();
+      onSuccess();
+      
+      if (issueType === 'partial') {
+        setShowIssueForm(false);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to issue items');
+    } finally {
+      setIssuing(false);
+    }
+  };
+
+  const handleQuantityChange = (itemId, quantity) => {
+    setIssueQuantities(prev => ({
+      ...prev,
+      [itemId]: Math.max(0, parseInt(quantity) || 0)
+    }));
   };
 
   const getStatusColor = (status) => {
@@ -108,6 +157,20 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
     }
   };
 
+  const canIssueItems = () => {
+    return details && details.status === 'approved' && 
+           details.items.some(item => (item.quantity_fulfilled || 0) < item.quantity_requested);
+  };
+
+  const getItemFulfillmentStatus = (item) => {
+    const fulfilled = item.quantity_fulfilled || 0;
+    const requested = item.quantity_requested;
+    
+    if (fulfilled === 0) return { status: 'pending', color: 'text-gray-600' };
+    if (fulfilled >= requested) return { status: 'fulfilled', color: 'text-green-600' };
+    return { status: 'partial', color: 'text-orange-600' };
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -132,13 +195,34 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
             <h2 className="text-xl font-semibold text-gray-900">Requisition Details</h2>
             <p className="text-sm text-gray-600">{details.requisition_number}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-            title="Close"
-          >
-            <X className="h-6 w-6" />
-          </button>
+          <div className="flex items-center space-x-3">
+            {canIssueItems() && (
+              <>
+                <button
+                  onClick={() => handleIssueItems('full')}
+                  disabled={issuing}
+                  className="btn-success flex items-center disabled:opacity-50"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {issuing ? 'Issuing...' : 'Issue All'}
+                </button>
+                <button
+                  onClick={() => setShowIssueForm(!showIssueForm)}
+                  className="btn-primary flex items-center"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Partial Issue
+                </button>
+              </>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+              title="Close"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
@@ -224,58 +308,104 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
 
               {/* Requested Items */}
               <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Requested Items</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Items for Review</h3>
                 
                 <div className="space-y-4">
-                  {details.items.map((item, index) => (
-                    <div key={item.id || index} className="border border-gray-200 rounded-lg p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500">Item Name</label>
-                          <p className="mt-1 text-sm font-medium text-gray-900">{item.item_name}</p>
-                          {item.inventory_sku && (
-                            <p className="text-xs text-gray-500">SKU: {item.inventory_sku}</p>
-                          )}
+                  {details.items.map((item, index) => {
+                    const fulfillmentStatus = getItemFulfillmentStatus(item);
+                    const remainingQty = item.quantity_requested - (item.quantity_fulfilled || 0);
+                    
+                    return (
+                      <div key={item.id || index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Item</label>
+                            <p className="mt-1 text-sm font-medium text-gray-900">{item.item_name}</p>
+                            {item.inventory_sku && (
+                              <p className="text-xs text-gray-500">SKU: {item.inventory_sku}</p>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Requested</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {item.quantity_requested} {item.unit_abbreviation || 'units'}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Fulfilled</label>
+                            <p className={`mt-1 text-sm font-medium ${fulfillmentStatus.color}`}>
+                              {item.quantity_fulfilled || 0} {item.unit_abbreviation || 'units'}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Remaining</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {remainingQty} {item.unit_abbreviation || 'units'}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Unit Cost</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              ${(item.estimated_unit_cost || 0).toFixed(2)}
+                            </p>
+                          </div>
                         </div>
                         
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500">Quantity</label>
-                          <p className="mt-1 text-sm text-gray-900">
-                            {item.quantity_requested} {item.unit_abbreviation || 'units'}
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500">Unit Cost</label>
-                          <p className="mt-1 text-sm text-gray-900">
-                            ${(item.estimated_unit_cost || 0).toFixed(2)}
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500">Total Cost</label>
-                          <p className="mt-1 text-sm font-medium text-green-600">
-                            ${(item.total_estimated_cost || 0).toFixed(2)}
-                          </p>
-                        </div>
+                        {item.item_description && (
+                          <div className="mt-3">
+                            <label className="block text-sm font-medium text-gray-500">Description</label>
+                            <p className="mt-1 text-sm text-gray-900">{item.item_description}</p>
+                          </div>
+                        )}
+
+                        {/* Partial Issue Form */}
+                        {showIssueForm && remainingQty > 0 && (
+                          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                            <label className="block text-sm font-medium text-blue-700 mb-2">
+                              Issue Quantity (Max: {remainingQty})
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max={remainingQty}
+                              className="form-input w-32"
+                              value={issueQuantities[item.id] || 0}
+                              onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                            />
+                          </div>
+                        )}
                       </div>
-                      
-                      {item.item_description && (
-                        <div className="mt-3">
-                          <label className="block text-sm font-medium text-gray-500">Description</label>
-                          <p className="mt-1 text-sm text-gray-900">{item.item_description}</p>
-                        </div>
-                      )}
-                      
-                      {item.notes && (
-                        <div className="mt-3">
-                          <label className="block text-sm font-medium text-gray-500">Notes</label>
-                          <p className="mt-1 text-sm text-gray-900">{item.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+
+                {/* Partial Issue Actions */}
+                {showIssueForm && (
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-gray-900">Issue Selected Quantities</h4>
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() => setShowIssueForm(false)}
+                          className="btn-secondary"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleIssueItems('partial')}
+                          disabled={issuing || Object.values(issueQuantities).every(qty => qty === 0)}
+                          className="btn-primary disabled:opacity-50"
+                        >
+                          {issuing ? 'Issuing...' : 'Issue Items'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Total Cost */}
                 <div className="mt-6 p-4 bg-green-50 rounded-lg">
@@ -289,60 +419,98 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
                     </span>
                   </div>
                 </div>
+
+                {/* Purchase Order Notice */}
+                {details.items.some(item => item.needs_purchase) && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start">
+                      <ShoppingCart className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-medium text-yellow-900">Purchase Orders Required</h4>
+                        <p className="text-sm text-yellow-800 mt-1">
+                          Some items require purchase orders due to insufficient stock. These will be processed separately.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Workflow Progress */}
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Approval Workflow</h3>
+              {/* Current Step Info */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                <h3 className="text-lg font-medium text-yellow-900 mb-4">Current Status</h3>
                 
-                <div className="space-y-4">
-                  {details.workflowSteps.map((step, index) => {
-                    const isCurrentStep = step.step_order === details.current_step;
-                    const isCompleted = details.approvals.some(approval => 
-                      approval.workflow_step_id === step.id && approval.action === 'approved'
-                    );
-                    const isRejected = details.approvals.some(approval => 
-                      approval.workflow_step_id === step.id && approval.action === 'rejected'
-                    );
-                    
-                    return (
-                      <div key={step.id} className={`flex items-center p-3 rounded-lg ${
-                        isCurrentStep ? 'bg-yellow-50 border border-yellow-200' :
-                        isCompleted ? 'bg-green-50 border border-green-200' :
-                        isRejected ? 'bg-red-50 border border-red-200' :
-                        'bg-gray-50 border border-gray-200'
-                      }`}>
-                        <div className="flex-shrink-0">
-                          {isCompleted ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          ) : isRejected ? (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          ) : isCurrentStep ? (
-                            <Clock className="h-5 w-5 text-yellow-500" />
-                          ) : (
-                            <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
-                          )}
-                        </div>
-                        <div className="ml-3 flex-1">
-                          <p className="text-sm font-medium text-gray-900">
-                            Step {step.step_order}: {step.approver_role.charAt(0).toUpperCase() + step.approver_role.slice(1)} Approval
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {isCompleted ? 'Approved' :
-                             isRejected ? 'Rejected' :
-                             isCurrentStep ? 'Pending' : 'Waiting'}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <Clock className="h-5 w-5 text-yellow-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-900">
+                        {details.status.replace('_', ' ').toUpperCase()}
+                      </p>
+                      {details.status === 'pending_approval' && (
+                        <p className="text-xs text-yellow-700">
+                          Step {details.current_step}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Approval History */}
+              {/* Workflow Progress */}
+              {details.workflowSteps && details.workflowSteps.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Approval Workflow</h3>
+                  
+                  <div className="space-y-4">
+                    {details.workflowSteps.map((step, index) => {
+                      const isCurrentStep = step.step_order === details.current_step;
+                      const isCompleted = details.approvals.some(approval => 
+                        approval.workflow_step_id === step.id && approval.action === 'approved'
+                      );
+                      const isRejected = details.approvals.some(approval => 
+                        approval.workflow_step_id === step.id && approval.action === 'rejected'
+                      );
+                      
+                      return (
+                        <div key={step.id} className={`flex items-center p-3 rounded-lg ${
+                          isCurrentStep ? 'bg-yellow-50 border border-yellow-200' :
+                          isCompleted ? 'bg-green-50 border border-green-200' :
+                          isRejected ? 'bg-red-50 border border-red-200' :
+                          'bg-gray-50 border border-gray-200'
+                        }`}>
+                          <div className="flex-shrink-0">
+                            {isCompleted ? (
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                            ) : isRejected ? (
+                              <XCircle className="h-5 w-5 text-red-500" />
+                            ) : isCurrentStep ? (
+                              <Clock className="h-5 w-5 text-yellow-500" />
+                            ) : (
+                              <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
+                            )}
+                          </div>
+                          <div className="ml-3 flex-1">
+                            <p className="text-sm font-medium text-gray-900">
+                              Step {step.step_order}: {step.approver_role.charAt(0).toUpperCase() + step.approver_role.slice(1)} Approval
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {isCompleted ? 'Approved' :
+                               isRejected ? 'Rejected' :
+                               isCurrentStep ? 'Pending' : 'Waiting'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Previous Approvals */}
               {details.approvals.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Approval History</h3>

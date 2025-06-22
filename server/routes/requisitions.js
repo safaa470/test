@@ -102,11 +102,12 @@ router.get('/:id', (req, res) => {
       return res.status(404).json({ error: 'Requisition not found' });
     }
 
-    // Get requisition items
+    // Get requisition items with inventory and stock info
     const itemsQuery = `
       SELECT ri.*, 
              i.name as inventory_item_name,
              i.sku as inventory_sku,
+             i.quantity as current_stock,
              u.name as unit_name,
              u.abbreviation as unit_abbreviation
       FROM requisition_items ri
@@ -120,6 +121,15 @@ router.get('/:id', (req, res) => {
       if (err) {
         return res.status(500).json({ error: 'Database error' });
       }
+
+      // Add stock analysis to items
+      const itemsWithStockInfo = items.map(item => ({
+        ...item,
+        current_stock: item.current_stock || 0,
+        available_stock: item.current_stock || 0,
+        needs_purchase: item.inventory_id ? (item.quantity_requested > (item.current_stock || 0)) : true,
+        quantity_fulfilled: item.quantity_fulfilled || 0
+      }));
 
       // Get approval history
       const approvalsQuery = `
@@ -157,7 +167,7 @@ router.get('/:id', (req, res) => {
 
           res.json({
             ...requisition,
-            items,
+            items: itemsWithStockInfo,
             approvals,
             workflowSteps
           });
@@ -290,6 +300,153 @@ router.post('/:id/submit', (req, res) => {
         'Status changed to submitted', req);
 
       res.json({ message: 'Requisition submitted successfully' });
+    });
+  });
+});
+
+// Issue requisition items (full or partial)
+router.post('/:id/issue', (req, res) => {
+  const { id } = req.params;
+  const { issue_type, items } = req.body; // 'full' or 'partial'
+  const { db } = req.app.locals;
+
+  // Check if requisition is approved
+  db.get('SELECT * FROM requisitions WHERE id = ? AND status = ?', [id, 'approved'], (err, requisition) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!requisition) {
+      return res.status(404).json({ error: 'Requisition not found or not approved' });
+    }
+
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+
+      let itemsProcessed = 0;
+      let hasErrors = false;
+
+      items.forEach(issueItem => {
+        if (issueItem.quantity_to_issue <= 0) {
+          itemsProcessed++;
+          return;
+        }
+
+        // Get current item details
+        db.get(`
+          SELECT ri.*, i.quantity as current_stock 
+          FROM requisition_items ri
+          LEFT JOIN inventory i ON ri.inventory_id = i.id
+          WHERE ri.id = ? AND ri.requisition_id = ?
+        `, [issueItem.id, id], (err, item) => {
+          if (err || !item) {
+            hasErrors = true;
+            itemsProcessed++;
+            return;
+          }
+
+          const newFulfilledQty = (item.quantity_fulfilled || 0) + issueItem.quantity_to_issue;
+          
+          // Update requisition item
+          db.run(`
+            UPDATE requisition_items 
+            SET quantity_fulfilled = ?, 
+                status = CASE 
+                  WHEN ? >= quantity_requested THEN 'fulfilled'
+                  WHEN ? > 0 THEN 'partially_fulfilled'
+                  ELSE 'pending'
+                END
+            WHERE id = ?
+          `, [newFulfilledQty, newFulfilledQty, newFulfilledQty, issueItem.id], (err) => {
+            if (err) {
+              hasErrors = true;
+            }
+
+            // Update inventory if linked
+            if (item.inventory_id && item.current_stock >= issueItem.quantity_to_issue) {
+              db.run(`
+                UPDATE inventory 
+                SET quantity = quantity - ?, 
+                    updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+              `, [issueItem.quantity_to_issue, item.inventory_id], (err) => {
+                if (err) {
+                  hasErrors = true;
+                }
+
+                // Record inventory movement
+                db.run(`
+                  INSERT INTO inventory_movements 
+                  (inventory_id, movement_type, quantity, reference_type, reference_id, notes, created_by)
+                  VALUES (?, 'OUT', ?, 'REQUISITION', ?, ?, ?)
+                `, [
+                  item.inventory_id, 
+                  issueItem.quantity_to_issue, 
+                  id, 
+                  `Issued for requisition ${requisition.requisition_number}`,
+                  req.user.id
+                ]);
+              });
+            }
+
+            itemsProcessed++;
+            
+            if (itemsProcessed === items.length) {
+              if (hasErrors) {
+                db.run('ROLLBACK');
+                return res.status(400).json({ error: 'Failed to issue some items' });
+              }
+
+              // Check if all items are fulfilled
+              db.get(`
+                SELECT 
+                  COUNT(*) as total_items,
+                  COUNT(CASE WHEN status = 'fulfilled' THEN 1 END) as fulfilled_items,
+                  COUNT(CASE WHEN status = 'partially_fulfilled' THEN 1 END) as partial_items
+                FROM requisition_items 
+                WHERE requisition_id = ?
+              `, [id], (err, summary) => {
+                if (err) {
+                  db.run('ROLLBACK');
+                  return res.status(500).json({ error: 'Database error' });
+                }
+
+                let newStatus = 'approved';
+                if (summary.fulfilled_items === summary.total_items) {
+                  newStatus = 'fulfilled';
+                } else if (summary.partial_items > 0 || summary.fulfilled_items > 0) {
+                  newStatus = 'partially_fulfilled';
+                }
+
+                // Update requisition status
+                db.run(`
+                  UPDATE requisitions 
+                  SET status = ?, 
+                      fulfilled_at = CASE WHEN ? = 'fulfilled' THEN CURRENT_TIMESTAMP ELSE fulfilled_at END,
+                      updated_at = CURRENT_TIMESTAMP
+                  WHERE id = ?
+                `, [newStatus, newStatus, id], (err) => {
+                  if (err) {
+                    db.run('ROLLBACK');
+                    return res.status(400).json({ error: 'Failed to update requisition status' });
+                  }
+
+                  db.run('COMMIT');
+
+                  logUserActivity(db, req.user.id, 'update', 
+                    `Issued items for requisition: ${requisition.requisition_number}`, 
+                    `${issue_type} issue - ${items.length} items processed`, req);
+
+                  res.json({ 
+                    message: 'Items issued successfully',
+                    new_status: newStatus
+                  });
+                });
+              });
+            }
+          });
+        });
+      });
     });
   });
 });

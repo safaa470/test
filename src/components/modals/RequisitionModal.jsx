@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { X, Plus, Trash2, Package, DollarSign, Calendar, AlertCircle, Building } from 'lucide-react';
+import { X, Plus, Trash2, Package, DollarSign, Calendar, AlertCircle, Building, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -20,7 +20,10 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     quantity_requested: 1,
     unit_id: '',
     estimated_unit_cost: 0,
-    notes: ''
+    notes: '',
+    current_stock: 0,
+    available_stock: 0,
+    needs_purchase: false
   }]);
   const [loading, setLoading] = useState(false);
   const [inventory, setInventory] = useState([]);
@@ -96,7 +99,10 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
           quantity_requested: item.quantity_requested,
           unit_id: item.unit_id || '',
           estimated_unit_cost: item.estimated_unit_cost || 0,
-          notes: item.notes || ''
+          notes: item.notes || '',
+          current_stock: 0,
+          available_stock: 0,
+          needs_purchase: false
         })));
       }
     } catch (error) {
@@ -163,7 +169,10 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
           quantity_requested: 1,
           unit_id: '',
           estimated_unit_cost: 0,
-          notes: ''
+          notes: '',
+          current_stock: 0,
+          available_stock: 0,
+          needs_purchase: false
         }]);
       }
       
@@ -195,7 +204,19 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         newItems[index].item_description = inventoryItem.description || '';
         newItems[index].unit_id = inventoryItem.base_unit_id;
         newItems[index].estimated_unit_cost = inventoryItem.unit_price || 0;
+        newItems[index].current_stock = inventoryItem.quantity || 0;
+        newItems[index].available_stock = inventoryItem.quantity || 0;
+        
+        // Check if purchase is needed
+        const requestedQty = newItems[index].quantity_requested || 0;
+        newItems[index].needs_purchase = requestedQty > inventoryItem.quantity;
       }
+    }
+    
+    // Update needs_purchase when quantity changes
+    if (field === 'quantity_requested') {
+      const requestedQty = parseInt(value) || 0;
+      newItems[index].needs_purchase = requestedQty > newItems[index].current_stock;
     }
     
     setItems(newItems);
@@ -209,7 +230,10 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
       quantity_requested: 1,
       unit_id: '',
       estimated_unit_cost: 0,
-      notes: ''
+      notes: '',
+      current_stock: 0,
+      available_stock: 0,
+      needs_purchase: false
     }]);
   };
 
@@ -223,6 +247,33 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     return items.reduce((total, item) => 
       total + (item.quantity_requested * (item.estimated_unit_cost || 0)), 0
     );
+  };
+
+  const getStockStatus = (item) => {
+    if (!item.inventory_id) return null;
+    
+    const requestedQty = item.quantity_requested || 0;
+    const currentStock = item.current_stock || 0;
+    
+    if (currentStock === 0) {
+      return {
+        type: 'out-of-stock',
+        message: 'Out of Stock - Will create purchase order',
+        color: 'text-red-600 bg-red-50 border-red-200'
+      };
+    } else if (requestedQty > currentStock) {
+      return {
+        type: 'partial-stock',
+        message: `Partial Stock: ${currentStock} available, ${requestedQty - currentStock} needs purchase`,
+        color: 'text-yellow-600 bg-yellow-50 border-yellow-200'
+      };
+    } else {
+      return {
+        type: 'in-stock',
+        message: `In Stock: ${currentStock} available`,
+        color: 'text-green-600 bg-green-50 border-green-200'
+      };
+    }
   };
 
   return (
@@ -380,140 +431,161 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
               </div>
 
               <div className="space-y-4">
-                {items.map((item, index) => (
-                  <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-900">Item {index + 1}</h4>
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                {items.map((item, index) => {
+                  const stockStatus = getStockStatus(item);
+                  
+                  return (
+                    <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-gray-900">Item {index + 1}</h4>
+                        {items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Inventory Item
+                          </label>
+                          <select
+                            className="form-select"
+                            value={item.inventory_id}
+                            onChange={(e) => handleItemChange(index, 'inventory_id', e.target.value)}
+                          >
+                            <option value="">Select from inventory (optional)</option>
+                            {inventory.map(invItem => (
+                              <option key={invItem.id} value={invItem.id}>
+                                {invItem.name} ({invItem.sku}) - Stock: {invItem.quantity}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Item Name *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            className="form-input"
+                            value={item.item_name}
+                            onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
+                            placeholder="Enter item name"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Quantity *
+                          </label>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            className="form-input"
+                            value={item.quantity_requested}
+                            onChange={(e) => handleItemChange(index, 'quantity_requested', e.target.value)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Unit
+                          </label>
+                          <select
+                            className="form-select"
+                            value={item.unit_id}
+                            onChange={(e) => handleItemChange(index, 'unit_id', e.target.value)}
+                          >
+                            <option value="">Select unit</option>
+                            {units.map(unit => (
+                              <option key={unit.id} value={unit.id}>
+                                {unit.name} ({unit.abbreviation})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Estimated Unit Cost ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="form-input"
+                            value={item.estimated_unit_cost}
+                            onChange={(e) => handleItemChange(index, 'estimated_unit_cost', e.target.value)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Total Cost
+                          </label>
+                          <input
+                            type="text"
+                            className="form-input bg-gray-50"
+                            value={`$${(item.quantity_requested * (item.estimated_unit_cost || 0)).toFixed(2)}`}
+                            readOnly
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Description
+                          </label>
+                          <textarea
+                            rows="2"
+                            className="form-input"
+                            value={item.item_description}
+                            onChange={(e) => handleItemChange(index, 'item_description', e.target.value)}
+                            placeholder="Enter item description"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Notes
+                          </label>
+                          <textarea
+                            rows="2"
+                            className="form-input"
+                            value={item.notes}
+                            onChange={(e) => handleItemChange(index, 'notes', e.target.value)}
+                            placeholder="Additional notes for this item"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Stock Status Display */}
+                      {stockStatus && (
+                        <div className={`mt-3 p-3 rounded-lg border ${stockStatus.color}`}>
+                          <div className="flex items-center">
+                            {stockStatus.type === 'in-stock' && <CheckCircle className="h-4 w-4 mr-2" />}
+                            {stockStatus.type === 'partial-stock' && <AlertTriangle className="h-4 w-4 mr-2" />}
+                            {stockStatus.type === 'out-of-stock' && <AlertCircle className="h-4 w-4 mr-2" />}
+                            <span className="text-sm font-medium">{stockStatus.message}</span>
+                          </div>
+                          {item.needs_purchase && (
+                            <div className="mt-2 text-xs">
+                              <strong>Note:</strong> This item will be flagged for purchase order creation upon approval.
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Inventory Item
-                        </label>
-                        <select
-                          className="form-select"
-                          value={item.inventory_id}
-                          onChange={(e) => handleItemChange(index, 'inventory_id', e.target.value)}
-                        >
-                          <option value="">Select from inventory (optional)</option>
-                          {inventory.map(invItem => (
-                            <option key={invItem.id} value={invItem.id}>
-                              {invItem.name} ({invItem.sku})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Item Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          className="form-input"
-                          value={item.item_name}
-                          onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
-                          placeholder="Enter item name"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Quantity *
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          min="1"
-                          className="form-input"
-                          value={item.quantity_requested}
-                          onChange={(e) => handleItemChange(index, 'quantity_requested', e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Unit
-                        </label>
-                        <select
-                          className="form-select"
-                          value={item.unit_id}
-                          onChange={(e) => handleItemChange(index, 'unit_id', e.target.value)}
-                        >
-                          <option value="">Select unit</option>
-                          {units.map(unit => (
-                            <option key={unit.id} value={unit.id}>
-                              {unit.name} ({unit.abbreviation})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Estimated Unit Cost ($)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="form-input"
-                          value={item.estimated_unit_cost}
-                          onChange={(e) => handleItemChange(index, 'estimated_unit_cost', e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Total Cost
-                        </label>
-                        <input
-                          type="text"
-                          className="form-input bg-gray-50"
-                          value={`$${(item.quantity_requested * (item.estimated_unit_cost || 0)).toFixed(2)}`}
-                          readOnly
-                        />
-                      </div>
-
-                      <div className="md:col-span-2 lg:col-span-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Description
-                        </label>
-                        <textarea
-                          rows="2"
-                          className="form-input"
-                          value={item.item_description}
-                          onChange={(e) => handleItemChange(index, 'item_description', e.target.value)}
-                          placeholder="Enter item description"
-                        />
-                      </div>
-
-                      <div className="md:col-span-2 lg:col-span-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Notes
-                        </label>
-                        <textarea
-                          rows="2"
-                          className="form-input"
-                          value={item.notes}
-                          onChange={(e) => handleItemChange(index, 'notes', e.target.value)}
-                          placeholder="Additional notes for this item"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Total Cost Summary */}
@@ -528,6 +600,22 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                   </span>
                 </div>
               </div>
+
+              {/* Purchase Order Notice */}
+              {items.some(item => item.needs_purchase) && (
+                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-medium text-yellow-900">Purchase Order Required</h4>
+                      <p className="text-sm text-yellow-800 mt-1">
+                        Some items in this requisition require purchase orders due to insufficient stock. 
+                        These will be automatically flagged for procurement upon approval.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </form>
         </div>
