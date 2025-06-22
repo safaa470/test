@@ -59,6 +59,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         axios.get('/api/departments').catch(() => ({ data: [] })) // Graceful fallback
       ]);
 
+      console.log('Inventory data:', inventoryRes.data); // Debug log
       setInventory(inventoryRes.data);
       setUnits(unitsRes.data);
       setDepartments(departmentsRes.data);
@@ -200,6 +201,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     if (field === 'inventory_id' && value) {
       const inventoryItem = inventory.find(item => item.id == value);
       if (inventoryItem) {
+        console.log('Selected inventory item:', inventoryItem); // Debug log
         newItems[index].item_name = inventoryItem.name;
         newItems[index].item_description = inventoryItem.description || '';
         newItems[index].unit_id = inventoryItem.base_unit_id;
@@ -274,6 +276,12 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         color: 'text-green-600 bg-green-50 border-green-200'
       };
     }
+  };
+
+  const getStockBadgeColor = (stock) => {
+    if (stock === 0) return 'bg-red-100 text-red-800';
+    if (stock <= 10) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
   };
 
   return (
@@ -462,10 +470,27 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                             <option value="">Select from inventory (optional)</option>
                             {inventory.map(invItem => (
                               <option key={invItem.id} value={invItem.id}>
-                                {invItem.name} ({invItem.sku}) - Stock: {invItem.quantity}
+                                {invItem.name} ({invItem.sku}) - Stock: {invItem.quantity || 0}
+                                {invItem.quantity === 0 && ' [OUT OF STOCK]'}
+                                {invItem.quantity > 0 && invItem.quantity <= 10 && ' [LOW STOCK]'}
                               </option>
                             ))}
                           </select>
+                          {item.inventory_id && (
+                            <div className="mt-1">
+                              {(() => {
+                                const selectedItem = inventory.find(inv => inv.id == item.inventory_id);
+                                if (selectedItem) {
+                                  return (
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockBadgeColor(selectedItem.quantity)}`}>
+                                      Stock: {selectedItem.quantity || 0} {selectedItem.base_unit_abbr || 'units'}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                          )}
                         </div>
 
                         <div>
