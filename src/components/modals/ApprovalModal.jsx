@@ -10,7 +10,9 @@ import {
   AlertTriangle,
   Clock,
   User,
-  FileText
+  FileText,
+  Edit3,
+  Calculator
 } from 'lucide-react';
 
 const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
@@ -19,6 +21,8 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
   const [submitting, setSubmitting] = useState(false);
   const [action, setAction] = useState('');
   const [comments, setComments] = useState('');
+  const [approvalQuantities, setApprovalQuantities] = useState({});
+  const [isPartialApproval, setIsPartialApproval] = useState(false);
 
   useEffect(() => {
     if (requisition) {
@@ -30,10 +34,38 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
     try {
       const response = await axios.get(`/api/requisitions/${requisition.id}`);
       setDetails(response.data);
+      
+      // Initialize approval quantities with requested quantities
+      const initialQuantities = {};
+      response.data.items.forEach(item => {
+        initialQuantities[item.id] = item.quantity_requested;
+      });
+      setApprovalQuantities(initialQuantities);
     } catch (error) {
       toast.error('Error fetching requisition details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleQuantityChange = (itemId, quantity) => {
+    const newQuantity = Math.max(0, parseInt(quantity) || 0);
+    setApprovalQuantities(prev => ({
+      ...prev,
+      [itemId]: newQuantity
+    }));
+    
+    // Check if this is a partial approval
+    const item = details.items.find(i => i.id === itemId);
+    if (item && newQuantity < item.quantity_requested) {
+      setIsPartialApproval(true);
+    } else {
+      // Check if any other items have partial quantities
+      const hasPartial = details.items.some(item => {
+        const approvedQty = itemId === item.id ? newQuantity : (approvalQuantities[item.id] || item.quantity_requested);
+        return approvedQty < item.quantity_requested;
+      });
+      setIsPartialApproval(hasPartial);
     }
   };
 
@@ -48,18 +80,45 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
       return;
     }
 
+    // Validate approval quantities
+    if (selectedAction === 'approved') {
+      const hasInvalidQuantities = details.items.some(item => {
+        const approvedQty = approvalQuantities[item.id] || 0;
+        return approvedQty < 0 || approvedQty > item.quantity_requested;
+      });
+
+      if (hasInvalidQuantities) {
+        toast.error('Approved quantities cannot be negative or exceed requested quantities');
+        return;
+      }
+
+      const hasZeroQuantities = details.items.every(item => {
+        const approvedQty = approvalQuantities[item.id] || 0;
+        return approvedQty === 0;
+      });
+
+      if (hasZeroQuantities) {
+        toast.error('At least one item must have an approved quantity greater than 0');
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
-      await axios.post(`/api/requisitions/${requisition.id}/approve`, {
+      const approvalData = {
         action: selectedAction,
-        comments: comments.trim()
-      });
+        comments: comments.trim(),
+        approvalQuantities: selectedAction === 'approved' ? approvalQuantities : null,
+        isPartialApproval: selectedAction === 'approved' ? isPartialApproval : false
+      };
+
+      await axios.post(`/api/requisitions/${requisition.id}/approve`, approvalData);
 
       const actionText = selectedAction === 'approved' ? 'approved' : 
                         selectedAction === 'rejected' ? 'rejected' : 'returned';
       
-      toast.success(`Requisition ${actionText} successfully`);
+      toast.success(`Requisition ${actionText} successfully${isPartialApproval ? ' (partial approval)' : ''}`);
       onSuccess();
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to process approval');
@@ -94,6 +153,34 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
     }
   };
 
+  const calculateTotalApprovedCost = () => {
+    return details.items.reduce((total, item) => {
+      const approvedQty = approvalQuantities[item.id] || 0;
+      return total + (approvedQty * (item.estimated_unit_cost || 0));
+    }, 0);
+  };
+
+  const getApprovalSummary = () => {
+    const totalItems = details.items.length;
+    const fullyApprovedItems = details.items.filter(item => 
+      (approvalQuantities[item.id] || 0) === item.quantity_requested
+    ).length;
+    const partiallyApprovedItems = details.items.filter(item => {
+      const approvedQty = approvalQuantities[item.id] || 0;
+      return approvedQty > 0 && approvedQty < item.quantity_requested;
+    }).length;
+    const rejectedItems = details.items.filter(item => 
+      (approvalQuantities[item.id] || 0) === 0
+    ).length;
+
+    return {
+      totalItems,
+      fullyApprovedItems,
+      partiallyApprovedItems,
+      rejectedItems
+    };
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -110,9 +197,11 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
     return null;
   }
 
+  const approvalSummary = getApprovalSummary();
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Review Requisition</h2>
@@ -164,8 +253,8 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-blue-700">Total Cost</label>
-                    <p className="mt-1 text-lg font-bold text-green-600">
+                    <label className="block text-sm font-medium text-blue-700">Original Total Cost</label>
+                    <p className="mt-1 text-lg font-bold text-blue-600">
                       ${details.total_estimated_cost.toFixed(2)}
                     </p>
                   </div>
@@ -195,52 +284,149 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
                 )}
               </div>
 
-              {/* Requested Items */}
+              {/* Items for Approval */}
               <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Items for Review</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Items for Approval</h3>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Edit3 className="h-4 w-4 mr-1" />
+                    Adjust quantities as needed
+                  </div>
+                </div>
                 
                 <div className="space-y-4">
-                  {details.items.map((item, index) => (
-                    <div key={item.id || index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500">Item</label>
-                          <p className="mt-1 text-sm font-medium text-gray-900">{item.item_name}</p>
-                          {item.inventory_sku && (
-                            <p className="text-xs text-gray-500">SKU: {item.inventory_sku}</p>
+                  {details.items.map((item, index) => {
+                    const approvedQty = approvalQuantities[item.id] || 0;
+                    const isPartial = approvedQty > 0 && approvedQty < item.quantity_requested;
+                    const isRejected = approvedQty === 0;
+                    const isFullyApproved = approvedQty === item.quantity_requested;
+                    
+                    return (
+                      <div key={item.id || index} className={`border rounded-lg p-4 ${
+                        isRejected ? 'border-red-200 bg-red-50' :
+                        isPartial ? 'border-yellow-200 bg-yellow-50' :
+                        isFullyApproved ? 'border-green-200 bg-green-50' :
+                        'border-gray-200 hover:bg-gray-50'
+                      }`}>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-500">Item</label>
+                            <p className="mt-1 text-sm font-medium text-gray-900">{item.item_name}</p>
+                            {item.inventory_sku && (
+                              <p className="text-xs text-gray-500">SKU: {item.inventory_sku}</p>
+                            )}
+                            {item.item_description && (
+                              <p className="text-xs text-gray-600 mt-1">{item.item_description}</p>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Requested</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {item.quantity_requested} {item.unit_abbreviation || 'units'}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">
+                              Approve Quantity *
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max={item.quantity_requested}
+                              className="mt-1 form-input w-full"
+                              value={approvedQty}
+                              onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                              disabled={action === 'rejected' || action === 'returned'}
+                            />
+                            <div className="flex justify-between mt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleQuantityChange(item.id, 0)}
+                                className="text-xs text-red-600 hover:text-red-800"
+                                disabled={action === 'rejected' || action === 'returned'}
+                              >
+                                Reject
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuantityChange(item.id, item.quantity_requested)}
+                                className="text-xs text-green-600 hover:text-green-800"
+                                disabled={action === 'rejected' || action === 'returned'}
+                              >
+                                Full
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500">Approved Cost</label>
+                            <p className="mt-1 text-sm font-medium text-green-600">
+                              ${(approvedQty * (item.estimated_unit_cost || 0)).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              @ ${(item.estimated_unit_cost || 0).toFixed(2)} each
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Status indicator */}
+                        <div className="mt-3 flex items-center">
+                          {isRejected && (
+                            <div className="flex items-center text-red-600">
+                              <XCircle className="h-4 w-4 mr-1" />
+                              <span className="text-sm font-medium">Item Rejected</span>
+                            </div>
+                          )}
+                          {isPartial && (
+                            <div className="flex items-center text-yellow-600">
+                              <AlertTriangle className="h-4 w-4 mr-1" />
+                              <span className="text-sm font-medium">
+                                Partial Approval ({approvedQty} of {item.quantity_requested})
+                              </span>
+                            </div>
+                          )}
+                          {isFullyApproved && (
+                            <div className="flex items-center text-green-600">
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              <span className="text-sm font-medium">Fully Approved</span>
+                            </div>
                           )}
                         </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500">Quantity</label>
-                          <p className="mt-1 text-sm text-gray-900">
-                            {item.quantity_requested} {item.unit_abbreviation || 'units'}
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500">Unit Cost</label>
-                          <p className="mt-1 text-sm text-gray-900">
-                            ${(item.estimated_unit_cost || 0).toFixed(2)}
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500">Total</label>
-                          <p className="mt-1 text-sm font-medium text-green-600">
-                            ${(item.total_estimated_cost || 0).toFixed(2)}
-                          </p>
-                        </div>
                       </div>
-                      
-                      {item.item_description && (
-                        <div className="mt-3">
-                          <label className="block text-sm font-medium text-gray-500">Description</label>
-                          <p className="mt-1 text-sm text-gray-700">{item.item_description}</p>
-                        </div>
-                      )}
+                    );
+                  })}
+                </div>
+
+                {/* Approval Summary */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-medium text-gray-900">Approval Summary</h4>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Calculator className="h-4 w-4 mr-1" />
+                      Total Approved Cost: ${calculateTotalApprovedCost().toFixed(2)}
                     </div>
-                  ))}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-green-600">{approvalSummary.fullyApprovedItems}</div>
+                      <div className="text-gray-600">Fully Approved</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-yellow-600">{approvalSummary.partiallyApprovedItems}</div>
+                      <div className="text-gray-600">Partially Approved</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-red-600">{approvalSummary.rejectedItems}</div>
+                      <div className="text-gray-600">Rejected</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-gray-600">{approvalSummary.totalItems}</div>
+                      <div className="text-gray-600">Total Items</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -266,6 +452,20 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
                       }
                     />
                   </div>
+                  
+                  {isPartialApproval && action === 'approved' && (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                        <div>
+                          <h4 className="text-sm font-medium text-yellow-900">Partial Approval Notice</h4>
+                          <p className="text-sm text-yellow-800 mt-1">
+                            You are approving partial quantities for some items. Please add comments explaining the reason for partial approval.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -305,7 +505,7 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
                     }`}
                   >
                     <CheckCircle className="h-5 w-5 mr-2" />
-                    Approve
+                    Approve {isPartialApproval ? '(Partial)' : ''}
                   </button>
                   
                   <button

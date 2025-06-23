@@ -352,7 +352,7 @@ router.post('/:id/issue', (req, res) => {
             UPDATE requisition_items 
             SET quantity_fulfilled = ?, 
                 status = CASE 
-                  WHEN ? >= quantity_requested THEN 'fulfilled'
+                  WHEN ? >= quantity_approved THEN 'fulfilled'
                   WHEN ? > 0 THEN 'partially_fulfilled'
                   ELSE 'pending'
                 END
@@ -451,10 +451,10 @@ router.post('/:id/issue', (req, res) => {
   });
 });
 
-// Approve/Reject requisition
+// Approve/Reject requisition with partial quantities
 router.post('/:id/approve', (req, res) => {
   const { id } = req.params;
-  const { action, comments } = req.body; // 'approved', 'rejected', 'returned'
+  const { action, comments, approvalQuantities, isPartialApproval } = req.body;
   const { db } = req.app.locals;
 
   if (!['approved', 'rejected', 'returned'].includes(action)) {
@@ -501,56 +501,189 @@ router.post('/:id/approve', (req, res) => {
           return res.status(400).json({ error: 'Failed to record approval' });
         }
 
-        let newStatus = requisition.status;
-        let newStep = requisition.current_step;
-
         if (action === 'approved') {
-          if (requisition.current_step >= requisition.total_steps) {
-            // Final approval
-            newStatus = 'approved';
-            db.run(`
-              UPDATE requisitions 
-              SET status = ?, approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-              WHERE id = ?
-            `, [newStatus, id]);
+          // Update approved quantities for each item
+          if (approvalQuantities) {
+            const updatePromises = Object.entries(approvalQuantities).map(([itemId, approvedQty]) => {
+              return new Promise((resolve, reject) => {
+                db.run(`
+                  UPDATE requisition_items 
+                  SET quantity_approved = ?,
+                      status = CASE 
+                        WHEN ? = quantity_requested THEN 'approved'
+                        WHEN ? > 0 THEN 'partially_approved'
+                        ELSE 'rejected'
+                      END
+                  WHERE id = ? AND requisition_id = ?
+                `, [approvedQty, approvedQty, approvedQty, itemId, id], (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                });
+              });
+            });
+
+            Promise.all(updatePromises)
+              .then(() => {
+                // Calculate new total approved cost
+                db.get(`
+                  SELECT SUM(quantity_approved * estimated_unit_cost) as total_approved_cost
+                  FROM requisition_items 
+                  WHERE requisition_id = ?
+                `, [id], (err, result) => {
+                  if (err) {
+                    db.run('ROLLBACK');
+                    return res.status(500).json({ error: 'Database error' });
+                  }
+
+                  const totalApprovedCost = result.total_approved_cost || 0;
+
+                  // Update requisition status
+                  let newStatus = requisition.status;
+                  let newStep = requisition.current_step;
+
+                  if (requisition.current_step >= requisition.total_steps) {
+                    // Final approval
+                    newStatus = 'approved';
+                    db.run(`
+                      UPDATE requisitions 
+                      SET status = ?, approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP,
+                          total_approved_cost = ?
+                      WHERE id = ?
+                    `, [newStatus, totalApprovedCost, id], (err) => {
+                      if (err) {
+                        db.run('ROLLBACK');
+                        return res.status(400).json({ error: 'Failed to update requisition' });
+                      }
+
+                      db.run('COMMIT');
+                      
+                      logUserActivity(db, req.user.id, 'update', 
+                        `Approved requisition: ${requisition.requisition_number}`, 
+                        `${isPartialApproval ? 'Partial approval' : 'Full approval'} - Total: $${totalApprovedCost}`, req);
+
+                      res.json({ 
+                        message: `Requisition approved successfully${isPartialApproval ? ' (partial approval)' : ''}`,
+                        newStatus,
+                        newStep,
+                        totalApprovedCost
+                      });
+                    });
+                  } else {
+                    // Move to next step
+                    newStep = requisition.current_step + 1;
+                    newStatus = 'pending_approval';
+                    db.run(`
+                      UPDATE requisitions 
+                      SET status = ?, current_step = ?, updated_at = CURRENT_TIMESTAMP,
+                          total_approved_cost = ?
+                      WHERE id = ?
+                    `, [newStatus, newStep, totalApprovedCost, id], (err) => {
+                      if (err) {
+                        db.run('ROLLBACK');
+                        return res.status(400).json({ error: 'Failed to update requisition' });
+                      }
+
+                      db.run('COMMIT');
+                      
+                      logUserActivity(db, req.user.id, 'update', 
+                        `Approved requisition step: ${requisition.requisition_number}`, 
+                        `Step ${requisition.current_step} approved, moved to step ${newStep}`, req);
+
+                      res.json({ 
+                        message: 'Requisition approved and moved to next step',
+                        newStatus,
+                        newStep,
+                        totalApprovedCost
+                      });
+                    });
+                  }
+                });
+              })
+              .catch((err) => {
+                db.run('ROLLBACK');
+                res.status(400).json({ error: 'Failed to update item quantities' });
+              });
           } else {
-            // Move to next step
-            newStep = requisition.current_step + 1;
-            newStatus = 'pending_approval';
-            db.run(`
-              UPDATE requisitions 
-              SET status = ?, current_step = ?, updated_at = CURRENT_TIMESTAMP
-              WHERE id = ?
-            `, [newStatus, newStep, id]);
+            // No partial quantities, proceed with normal approval
+            let newStatus = requisition.status;
+            let newStep = requisition.current_step;
+
+            if (requisition.current_step >= requisition.total_steps) {
+              newStatus = 'approved';
+              db.run(`
+                UPDATE requisitions 
+                SET status = ?, approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+              `, [newStatus, id]);
+            } else {
+              newStep = requisition.current_step + 1;
+              newStatus = 'pending_approval';
+              db.run(`
+                UPDATE requisitions 
+                SET status = ?, current_step = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+              `, [newStatus, newStep, id]);
+            }
+
+            db.run('COMMIT');
+            
+            logUserActivity(db, req.user.id, 'update', 
+              `Approved requisition: ${requisition.requisition_number}`, 
+              comments || `Action: ${action}`, req);
+
+            res.json({ 
+              message: `Requisition ${action} successfully`,
+              newStatus,
+              newStep
+            });
           }
         } else if (action === 'rejected') {
-          newStatus = 'rejected';
           db.run(`
             UPDATE requisitions 
             SET status = ?, rejected_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-          `, [newStatus, id]);
+          `, ['rejected', id], (err) => {
+            if (err) {
+              db.run('ROLLBACK');
+              return res.status(400).json({ error: 'Failed to update requisition' });
+            }
+
+            db.run('COMMIT');
+            
+            logUserActivity(db, req.user.id, 'update', 
+              `Rejected requisition: ${requisition.requisition_number}`, 
+              comments || `Action: ${action}`, req);
+
+            res.json({ 
+              message: 'Requisition rejected successfully',
+              newStatus: 'rejected',
+              newStep: requisition.current_step
+            });
+          });
         } else if (action === 'returned') {
-          newStatus = 'draft';
-          newStep = 1;
           db.run(`
             UPDATE requisitions 
             SET status = ?, current_step = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-          `, [newStatus, newStep, id]);
+          `, ['draft', 1, id], (err) => {
+            if (err) {
+              db.run('ROLLBACK');
+              return res.status(400).json({ error: 'Failed to update requisition' });
+            }
+
+            db.run('COMMIT');
+            
+            logUserActivity(db, req.user.id, 'update', 
+              `Returned requisition: ${requisition.requisition_number}`, 
+              comments || `Action: ${action}`, req);
+
+            res.json({ 
+              message: 'Requisition returned successfully',
+              newStatus: 'draft',
+              newStep: 1
+            });
+          });
         }
-
-        db.run('COMMIT');
-
-        logUserActivity(db, req.user.id, 'update', 
-          `${action.charAt(0).toUpperCase() + action.slice(1)} requisition: ${requisition.requisition_number}`, 
-          comments || `Action: ${action}`, req);
-
-        res.json({ 
-          message: `Requisition ${action} successfully`,
-          newStatus,
-          newStep
-        });
       });
     });
   });
