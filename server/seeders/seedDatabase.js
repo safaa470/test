@@ -18,6 +18,7 @@ const __dirname = path.dirname(__filename);
 class DatabaseSeeder {
   constructor() {
     const dbPath = path.join(__dirname, '../database/warehouse.db');
+    console.log('📍 Database path:', dbPath);
     this.db = new sqlite3.Database(dbPath);
     this.db.run('PRAGMA foreign_keys = ON');
   }
@@ -41,7 +42,7 @@ class DatabaseSeeder {
       console.log(`📊 Seeded ${sampleInventoryItems.length} inventory items`);
       
       // Display summary
-      this.displaySummary();
+      await this.displaySummary();
       
     } catch (error) {
       console.error('❌ Error seeding database:', error);
@@ -55,6 +56,9 @@ class DatabaseSeeder {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) {
+          console.error('SQL Error:', err.message);
+          console.error('SQL:', sql);
+          console.error('Params:', params);
           reject(err);
         } else {
           resolve({ lastID: this.lastID, changes: this.changes });
@@ -67,6 +71,7 @@ class DatabaseSeeder {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) {
+          console.error('SQL Error:', err.message);
           reject(err);
         } else {
           resolve(rows);
@@ -102,15 +107,20 @@ class DatabaseSeeder {
     console.log('📁 Seeding categories...');
     
     for (const category of sampleCategories) {
-      await this.runQuery(`
-        INSERT INTO categories (id, name, parent_id, description, created_at)
-        VALUES (?, ?, ?, ?, datetime('now'))
-      `, [
-        category.id,
-        category.name,
-        category.parent_id || null,
-        category.description
-      ]);
+      try {
+        await this.runQuery(`
+          INSERT INTO categories (id, name, parent_id, description, created_at)
+          VALUES (?, ?, ?, ?, datetime('now'))
+        `, [
+          category.id,
+          category.name,
+          category.parent_id || null,
+          category.description
+        ]);
+        console.log(`  ✓ Added category: ${category.name}`);
+      } catch (error) {
+        console.error(`  ✗ Failed to add category ${category.name}:`, error.message);
+      }
     }
 
     console.log(`✅ Seeded ${sampleCategories.length} categories`);
@@ -120,17 +130,22 @@ class DatabaseSeeder {
     console.log('📏 Seeding units...');
     
     for (const unit of sampleUnits) {
-      await this.runQuery(`
-        INSERT INTO units (id, name, abbreviation, unit_type, base_unit_id, conversion_factor, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      `, [
-        unit.id,
-        unit.name,
-        unit.abbreviation,
-        unit.unit_type,
-        unit.base_unit_id || null,
-        unit.conversion_factor || 1
-      ]);
+      try {
+        await this.runQuery(`
+          INSERT INTO units (id, name, abbreviation, unit_type, base_unit_id, conversion_factor, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        `, [
+          unit.id,
+          unit.name,
+          unit.abbreviation,
+          unit.unit_type,
+          unit.base_unit_id || null,
+          unit.conversion_factor || 1
+        ]);
+        console.log(`  ✓ Added unit: ${unit.name} (${unit.abbreviation})`);
+      } catch (error) {
+        console.error(`  ✗ Failed to add unit ${unit.name}:`, error.message);
+      }
     }
 
     console.log(`✅ Seeded ${sampleUnits.length} units`);
@@ -140,15 +155,20 @@ class DatabaseSeeder {
     console.log('📍 Seeding locations...');
     
     for (const location of sampleLocations) {
-      await this.runQuery(`
-        INSERT INTO locations (id, name, description, address, created_at)
-        VALUES (?, ?, ?, ?, datetime('now'))
-      `, [
-        location.id,
-        location.name,
-        location.description,
-        location.address
-      ]);
+      try {
+        await this.runQuery(`
+          INSERT INTO locations (id, name, description, address, created_at)
+          VALUES (?, ?, ?, ?, datetime('now'))
+        `, [
+          location.id,
+          location.name,
+          location.description,
+          location.address
+        ]);
+        console.log(`  ✓ Added location: ${location.name}`);
+      } catch (error) {
+        console.error(`  ✗ Failed to add location ${location.name}:`, error.message);
+      }
     }
 
     console.log(`✅ Seeded ${sampleLocations.length} locations`);
@@ -158,17 +178,22 @@ class DatabaseSeeder {
     console.log('🚚 Seeding suppliers...');
     
     for (const supplier of sampleSuppliers) {
-      await this.runQuery(`
-        INSERT INTO suppliers (id, name, contact_person, email, phone, address, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      `, [
-        supplier.id,
-        supplier.name,
-        supplier.contact_person,
-        supplier.email,
-        supplier.phone,
-        supplier.address
-      ]);
+      try {
+        await this.runQuery(`
+          INSERT INTO suppliers (id, name, contact_person, email, phone, address, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        `, [
+          supplier.id,
+          supplier.name,
+          supplier.contact_person,
+          supplier.email,
+          supplier.phone,
+          supplier.address
+        ]);
+        console.log(`  ✓ Added supplier: ${supplier.name}`);
+      } catch (error) {
+        console.error(`  ✗ Failed to add supplier ${supplier.name}:`, error.message);
+      }
     }
 
     console.log(`✅ Seeded ${sampleSuppliers.length} suppliers`);
@@ -178,27 +203,32 @@ class DatabaseSeeder {
     console.log('📦 Seeding inventory items...');
     
     for (const item of sampleInventoryItems) {
-      await this.runQuery(`
-        INSERT INTO inventory (
-          id, name, sku, description, category_id, base_unit_id, issue_unit_id,
-          location_id, supplier_id, quantity, min_quantity, max_quantity, unit_price,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `, [
-        item.id,
-        item.name,
-        item.sku,
-        item.description,
-        item.category_id,
-        item.base_unit_id,
-        item.issue_unit_id || null,
-        item.location_id,
-        item.supplier_id,
-        item.quantity,
-        item.min_quantity,
-        item.max_quantity,
-        item.unit_price
-      ]);
+      try {
+        await this.runQuery(`
+          INSERT INTO inventory (
+            id, name, sku, description, category_id, base_unit_id, issue_unit_id,
+            location_id, supplier_id, quantity, min_quantity, max_quantity, unit_price,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        `, [
+          item.id,
+          item.name,
+          item.sku,
+          item.description,
+          item.category_id,
+          item.base_unit_id,
+          item.issue_unit_id || null,
+          item.location_id,
+          item.supplier_id,
+          item.quantity,
+          item.min_quantity,
+          item.max_quantity,
+          item.unit_price
+        ]);
+        console.log(`  ✓ Added inventory item: ${item.name} (${item.sku})`);
+      } catch (error) {
+        console.error(`  ✗ Failed to add inventory item ${item.name}:`, error.message);
+      }
     }
 
     console.log(`✅ Seeded ${sampleInventoryItems.length} inventory items`);
@@ -209,68 +239,68 @@ class DatabaseSeeder {
     
     // Update total_value for all items
     for (const item of sampleInventoryItems) {
-      await this.runQuery(`
-        UPDATE inventory 
-        SET total_value = quantity * unit_price,
-            updated_at = datetime('now')
-        WHERE id = ?
-      `, [item.id]);
+      try {
+        await this.runQuery(`
+          UPDATE inventory 
+          SET total_value = quantity * unit_price,
+              updated_at = datetime('now')
+          WHERE id = ?
+        `, [item.id]);
+      } catch (error) {
+        console.error(`  ✗ Failed to update calculations for item ${item.id}:`, error.message);
+      }
     }
 
     console.log('✅ Updated inventory calculations');
   }
 
-  displaySummary() {
+  async displaySummary() {
     console.log('\n📊 SEEDING SUMMARY');
     console.log('==================');
     
-    // Get counts from database
-    this.getData('SELECT COUNT(*) as count FROM categories').then(result => {
-      console.log(`📁 Categories: ${result[0].count}`);
-    });
-    
-    this.getData('SELECT COUNT(*) as count FROM units').then(result => {
-      console.log(`📏 Units: ${result[0].count}`);
-    });
-    
-    this.getData('SELECT COUNT(*) as count FROM locations').then(result => {
-      console.log(`📍 Locations: ${result[0].count}`);
-    });
-    
-    this.getData('SELECT COUNT(*) as count FROM suppliers').then(result => {
-      console.log(`🚚 Suppliers: ${result[0].count}`);
-    });
-    
-    this.getData('SELECT COUNT(*) as count FROM inventory').then(result => {
-      console.log(`📦 Inventory Items: ${result[0].count}`);
-    });
-    
-    // Get inventory statistics
-    this.getData('SELECT SUM(total_value) as total FROM inventory').then(result => {
-      const totalValue = result[0].total || 0;
+    try {
+      // Get counts from database
+      const categoriesResult = await this.getData('SELECT COUNT(*) as count FROM categories');
+      console.log(`📁 Categories: ${categoriesResult[0].count}`);
+      
+      const unitsResult = await this.getData('SELECT COUNT(*) as count FROM units');
+      console.log(`📏 Units: ${unitsResult[0].count}`);
+      
+      const locationsResult = await this.getData('SELECT COUNT(*) as count FROM locations');
+      console.log(`📍 Locations: ${locationsResult[0].count}`);
+      
+      const suppliersResult = await this.getData('SELECT COUNT(*) as count FROM suppliers');
+      console.log(`🚚 Suppliers: ${suppliersResult[0].count}`);
+      
+      const inventoryResult = await this.getData('SELECT COUNT(*) as count FROM inventory');
+      console.log(`📦 Inventory Items: ${inventoryResult[0].count}`);
+      
+      // Get inventory statistics
+      const totalValueResult = await this.getData('SELECT SUM(total_value) as total FROM inventory');
+      const totalValue = totalValueResult[0].total || 0;
       console.log(`💰 Total Inventory Value: $${totalValue.toFixed(2)}`);
-    });
-    
-    this.getData('SELECT COUNT(*) as count FROM inventory WHERE quantity <= min_quantity').then(result => {
-      console.log(`⚠️  Low Stock Items: ${result[0].count}`);
-    });
-    
-    this.getData('SELECT COUNT(*) as count FROM inventory WHERE quantity = 0').then(result => {
-      console.log(`🚫 Out of Stock Items: ${result[0].count}`);
-    });
-    
-    console.log('\n🎯 Test Data Includes:');
-    console.log('- Office supplies (pens, paper, notebooks)');
-    console.log('- Electronics (laptops, tablets, accessories)');
-    console.log('- Furniture (chairs, desks, storage)');
-    console.log('- Safety equipment (helmets, vests, gloves)');
-    console.log('- Cleaning supplies (cleaners, towels, bags)');
-    console.log('- Tools & hardware (drills, screwdrivers, measuring tools)');
-    console.log('- Items with various stock levels (normal, low, out of stock)');
-    console.log('- Multiple units and conversions');
-    console.log('- Realistic pricing and quantities');
-    
-    console.log('\n✅ Ready for testing!');
+      
+      const lowStockResult = await this.getData('SELECT COUNT(*) as count FROM inventory WHERE quantity <= min_quantity');
+      console.log(`⚠️  Low Stock Items: ${lowStockResult[0].count}`);
+      
+      const outOfStockResult = await this.getData('SELECT COUNT(*) as count FROM inventory WHERE quantity = 0');
+      console.log(`🚫 Out of Stock Items: ${outOfStockResult[0].count}`);
+      
+      console.log('\n🎯 Test Data Includes:');
+      console.log('- Office supplies (pens, paper, notebooks)');
+      console.log('- Electronics (laptops, tablets, accessories)');
+      console.log('- Furniture (chairs, desks, storage)');
+      console.log('- Safety equipment (helmets, vests, gloves)');
+      console.log('- Cleaning supplies (cleaners, towels, bags)');
+      console.log('- Tools & hardware (drills, screwdrivers, measuring tools)');
+      console.log('- Items with various stock levels (normal, low, out of stock)');
+      console.log('- Multiple units and conversions');
+      console.log('- Realistic pricing and quantities');
+      
+      console.log('\n✅ Ready for testing!');
+    } catch (error) {
+      console.error('Error displaying summary:', error);
+    }
   }
 }
 
