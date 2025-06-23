@@ -10,8 +10,7 @@
     "server": "node server/index.cjs",
     "build": "vite build",
     "preview": "vite preview --port 3000 --host 0.0.0.0",
-    "start": "npm run dev-simple",
-    "install-deps": "npm install"
+    "start": "npm run dev-simple"
   },
   "dependencies": {
     "react": "^18.3.1",
