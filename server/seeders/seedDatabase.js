@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { 
@@ -9,14 +9,17 @@ import {
   sampleInventoryItems 
 } from './sampleData.js';
 
+const require = createRequire(import.meta.url);
+const sqlite3 = require('sqlite3').verbose();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 class DatabaseSeeder {
   constructor() {
     const dbPath = path.join(__dirname, '../database/warehouse.db');
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
+    this.db = new sqlite3.Database(dbPath);
+    this.db.run('PRAGMA foreign_keys = ON');
   }
 
   async seedAll() {
@@ -48,157 +51,156 @@ class DatabaseSeeder {
     }
   }
 
+  runQuery(sql, params = []) {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, params, function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ lastID: this.lastID, changes: this.changes });
+        }
+      });
+    });
+  }
+
+  getData(sql, params = []) {
+    return new Promise((resolve, reject) => {
+      this.db.all(sql, params, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
   async clearExistingData() {
     console.log('🧹 Clearing existing data...');
     
     // Disable foreign key constraints temporarily
-    this.db.pragma('foreign_keys = OFF');
+    await this.runQuery('PRAGMA foreign_keys = OFF');
     
     try {
-      this.db.exec('DELETE FROM inventory');
-      this.db.exec('DELETE FROM suppliers');
-      this.db.exec('DELETE FROM locations');
-      this.db.exec('DELETE FROM units');
-      this.db.exec('DELETE FROM categories');
+      await this.runQuery('DELETE FROM inventory');
+      await this.runQuery('DELETE FROM suppliers');
+      await this.runQuery('DELETE FROM locations');
+      await this.runQuery('DELETE FROM units');
+      await this.runQuery('DELETE FROM categories');
       
       // Reset auto-increment counters
-      this.db.exec('DELETE FROM sqlite_sequence WHERE name IN ("inventory", "suppliers", "locations", "units", "categories")');
+      await this.runQuery('DELETE FROM sqlite_sequence WHERE name IN ("inventory", "suppliers", "locations", "units", "categories")');
       
       console.log('✅ Existing data cleared');
     } finally {
       // Re-enable foreign key constraints
-      this.db.pragma('foreign_keys = ON');
+      await this.runQuery('PRAGMA foreign_keys = ON');
     }
   }
 
   async seedCategories() {
     console.log('📁 Seeding categories...');
     
-    const insertCategory = this.db.prepare(`
-      INSERT INTO categories (id, name, parent_id, description, created_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
-    `);
+    for (const category of sampleCategories) {
+      await this.runQuery(`
+        INSERT INTO categories (id, name, parent_id, description, created_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `, [
+        category.id,
+        category.name,
+        category.parent_id || null,
+        category.description
+      ]);
+    }
 
-    const insertMany = this.db.transaction((categories) => {
-      for (const category of categories) {
-        insertCategory.run(
-          category.id,
-          category.name,
-          category.parent_id || null,
-          category.description
-        );
-      }
-    });
-
-    insertMany(sampleCategories);
     console.log(`✅ Seeded ${sampleCategories.length} categories`);
   }
 
   async seedUnits() {
     console.log('📏 Seeding units...');
     
-    const insertUnit = this.db.prepare(`
-      INSERT INTO units (id, name, abbreviation, unit_type, base_unit_id, conversion_factor, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-    `);
+    for (const unit of sampleUnits) {
+      await this.runQuery(`
+        INSERT INTO units (id, name, abbreviation, unit_type, base_unit_id, conversion_factor, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `, [
+        unit.id,
+        unit.name,
+        unit.abbreviation,
+        unit.unit_type,
+        unit.base_unit_id || null,
+        unit.conversion_factor || 1
+      ]);
+    }
 
-    const insertMany = this.db.transaction((units) => {
-      for (const unit of units) {
-        insertUnit.run(
-          unit.id,
-          unit.name,
-          unit.abbreviation,
-          unit.unit_type,
-          unit.base_unit_id || null,
-          unit.conversion_factor || 1
-        );
-      }
-    });
-
-    insertMany(sampleUnits);
     console.log(`✅ Seeded ${sampleUnits.length} units`);
   }
 
   async seedLocations() {
     console.log('📍 Seeding locations...');
     
-    const insertLocation = this.db.prepare(`
-      INSERT INTO locations (id, name, description, address, created_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
-    `);
+    for (const location of sampleLocations) {
+      await this.runQuery(`
+        INSERT INTO locations (id, name, description, address, created_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `, [
+        location.id,
+        location.name,
+        location.description,
+        location.address
+      ]);
+    }
 
-    const insertMany = this.db.transaction((locations) => {
-      for (const location of locations) {
-        insertLocation.run(
-          location.id,
-          location.name,
-          location.description,
-          location.address
-        );
-      }
-    });
-
-    insertMany(sampleLocations);
     console.log(`✅ Seeded ${sampleLocations.length} locations`);
   }
 
   async seedSuppliers() {
     console.log('🚚 Seeding suppliers...');
     
-    const insertSupplier = this.db.prepare(`
-      INSERT INTO suppliers (id, name, contact_person, email, phone, address, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-    `);
+    for (const supplier of sampleSuppliers) {
+      await this.runQuery(`
+        INSERT INTO suppliers (id, name, contact_person, email, phone, address, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `, [
+        supplier.id,
+        supplier.name,
+        supplier.contact_person,
+        supplier.email,
+        supplier.phone,
+        supplier.address
+      ]);
+    }
 
-    const insertMany = this.db.transaction((suppliers) => {
-      for (const supplier of suppliers) {
-        insertSupplier.run(
-          supplier.id,
-          supplier.name,
-          supplier.contact_person,
-          supplier.email,
-          supplier.phone,
-          supplier.address
-        );
-      }
-    });
-
-    insertMany(sampleSuppliers);
     console.log(`✅ Seeded ${sampleSuppliers.length} suppliers`);
   }
 
   async seedInventoryItems() {
     console.log('📦 Seeding inventory items...');
     
-    const insertItem = this.db.prepare(`
-      INSERT INTO inventory (
-        id, name, sku, description, category_id, base_unit_id, issue_unit_id,
-        location_id, supplier_id, quantity, min_quantity, max_quantity, unit_price,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `);
+    for (const item of sampleInventoryItems) {
+      await this.runQuery(`
+        INSERT INTO inventory (
+          id, name, sku, description, category_id, base_unit_id, issue_unit_id,
+          location_id, supplier_id, quantity, min_quantity, max_quantity, unit_price,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, [
+        item.id,
+        item.name,
+        item.sku,
+        item.description,
+        item.category_id,
+        item.base_unit_id,
+        item.issue_unit_id || null,
+        item.location_id,
+        item.supplier_id,
+        item.quantity,
+        item.min_quantity,
+        item.max_quantity,
+        item.unit_price
+      ]);
+    }
 
-    const insertMany = this.db.transaction((items) => {
-      for (const item of items) {
-        insertItem.run(
-          item.id,
-          item.name,
-          item.sku,
-          item.description,
-          item.category_id,
-          item.base_unit_id,
-          item.issue_unit_id || null,
-          item.location_id,
-          item.supplier_id,
-          item.quantity,
-          item.min_quantity,
-          item.max_quantity,
-          item.unit_price
-        );
-      }
-    });
-
-    insertMany(sampleInventoryItems);
     console.log(`✅ Seeded ${sampleInventoryItems.length} inventory items`);
   }
 
@@ -206,20 +208,15 @@ class DatabaseSeeder {
     console.log('🧮 Updating inventory calculations...');
     
     // Update total_value for all items
-    const updateTotalValue = this.db.prepare(`
-      UPDATE inventory 
-      SET total_value = quantity * unit_price,
-          updated_at = datetime('now')
-      WHERE id = ?
-    `);
+    for (const item of sampleInventoryItems) {
+      await this.runQuery(`
+        UPDATE inventory 
+        SET total_value = quantity * unit_price,
+            updated_at = datetime('now')
+        WHERE id = ?
+      `, [item.id]);
+    }
 
-    const updateMany = this.db.transaction((items) => {
-      for (const item of items) {
-        updateTotalValue.run(item.id);
-      }
-    });
-
-    updateMany(sampleInventoryItems);
     console.log('✅ Updated inventory calculations');
   }
 
@@ -228,26 +225,39 @@ class DatabaseSeeder {
     console.log('==================');
     
     // Get counts from database
-    const categoriesCount = this.db.prepare('SELECT COUNT(*) as count FROM categories').get().count;
-    const unitsCount = this.db.prepare('SELECT COUNT(*) as count FROM units').get().count;
-    const locationsCount = this.db.prepare('SELECT COUNT(*) as count FROM locations').get().count;
-    const suppliersCount = this.db.prepare('SELECT COUNT(*) as count FROM suppliers').get().count;
-    const inventoryCount = this.db.prepare('SELECT COUNT(*) as count FROM inventory').get().count;
+    this.getData('SELECT COUNT(*) as count FROM categories').then(result => {
+      console.log(`📁 Categories: ${result[0].count}`);
+    });
     
-    console.log(`📁 Categories: ${categoriesCount}`);
-    console.log(`📏 Units: ${unitsCount}`);
-    console.log(`📍 Locations: ${locationsCount}`);
-    console.log(`🚚 Suppliers: ${suppliersCount}`);
-    console.log(`📦 Inventory Items: ${inventoryCount}`);
+    this.getData('SELECT COUNT(*) as count FROM units').then(result => {
+      console.log(`📏 Units: ${result[0].count}`);
+    });
+    
+    this.getData('SELECT COUNT(*) as count FROM locations').then(result => {
+      console.log(`📍 Locations: ${result[0].count}`);
+    });
+    
+    this.getData('SELECT COUNT(*) as count FROM suppliers').then(result => {
+      console.log(`🚚 Suppliers: ${result[0].count}`);
+    });
+    
+    this.getData('SELECT COUNT(*) as count FROM inventory').then(result => {
+      console.log(`📦 Inventory Items: ${result[0].count}`);
+    });
     
     // Get inventory statistics
-    const totalValue = this.db.prepare('SELECT SUM(total_value) as total FROM inventory').get().total || 0;
-    const lowStockCount = this.db.prepare('SELECT COUNT(*) as count FROM inventory WHERE quantity <= min_quantity').get().count;
-    const outOfStockCount = this.db.prepare('SELECT COUNT(*) as count FROM inventory WHERE quantity = 0').get().count;
+    this.getData('SELECT SUM(total_value) as total FROM inventory').then(result => {
+      const totalValue = result[0].total || 0;
+      console.log(`💰 Total Inventory Value: $${totalValue.toFixed(2)}`);
+    });
     
-    console.log(`💰 Total Inventory Value: $${totalValue.toFixed(2)}`);
-    console.log(`⚠️  Low Stock Items: ${lowStockCount}`);
-    console.log(`🚫 Out of Stock Items: ${outOfStockCount}`);
+    this.getData('SELECT COUNT(*) as count FROM inventory WHERE quantity <= min_quantity').then(result => {
+      console.log(`⚠️  Low Stock Items: ${result[0].count}`);
+    });
+    
+    this.getData('SELECT COUNT(*) as count FROM inventory WHERE quantity = 0').then(result => {
+      console.log(`🚫 Out of Stock Items: ${result[0].count}`);
+    });
     
     console.log('\n🎯 Test Data Includes:');
     console.log('- Office supplies (pens, paper, notebooks)');

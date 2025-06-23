@@ -262,7 +262,7 @@ const sampleInventoryItems = [
   }
 ];
 
-module.exports = {
+export {
   sampleCategories,
   sampleUnits,
   sampleLocations,
