@@ -19,7 +19,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// Placeholder API routes - these will be expanded later
+// Dashboard stats endpoint
 app.get('/api/dashboard/stats', (req, res) => {
   res.json({
     totalItems: 0,
@@ -29,6 +29,23 @@ app.get('/api/dashboard/stats', (req, res) => {
   });
 });
 
+// User activity endpoint
+app.get('/api/users/:id/activity', (req, res) => {
+  res.json([]);
+});
+
+// Requisitions dashboard stats endpoint
+app.get('/api/requisitions/stats/dashboard', (req, res) => {
+  res.json({
+    totalRequisitions: 0,
+    pendingRequisitions: 0,
+    approvedRequisitions: 0,
+    rejectedRequisitions: 0,
+    totalValue: 0
+  });
+});
+
+// Authentication endpoint
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
   
