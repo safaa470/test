@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { X, Calculator } from 'lucide-react';
+import { X, Calculator, AlertTriangle, Info } from 'lucide-react';
 
 const InventoryModal = ({ item, categories, units, locations, suppliers, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -21,6 +21,7 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
   const [loading, setLoading] = useState(false);
   const [compatibleUnits, setCompatibleUnits] = useState([]);
   const [conversionPreview, setConversionPreview] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     if (item) {
@@ -93,8 +94,49 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
     }
   };
 
+  const validateForm = () => {
+    const errors = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'Item name is required';
+    }
+
+    if (!formData.sku.trim()) {
+      errors.sku = 'SKU is required';
+    }
+
+    if (formData.quantity < 0) {
+      errors.quantity = 'Quantity cannot be negative';
+    }
+
+    if (formData.min_quantity < 0) {
+      errors.min_quantity = 'Minimum quantity cannot be negative';
+    }
+
+    if (formData.max_quantity < 0) {
+      errors.max_quantity = 'Maximum quantity cannot be negative';
+    }
+
+    if (formData.min_quantity > formData.max_quantity && formData.max_quantity > 0) {
+      errors.max_quantity = 'Maximum quantity must be greater than minimum quantity';
+    }
+
+    if (formData.unit_price < 0) {
+      errors.unit_price = 'Unit price cannot be negative';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Please fix the validation errors');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -121,6 +163,7 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
           unit_price: 0
         });
         setConversionPreview(null);
+        setValidationErrors({});
       }
       
       // Call onSuccess to refresh data but don't close modal
@@ -138,6 +181,14 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
       ...prev,
       [name]: value
     }));
+
+    // Clear validation error for this field
+    if (validationErrors[name]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
   };
 
   // Organize categories hierarchically
@@ -152,6 +203,10 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
   };
 
   const organizedCategories = organizeCategories();
+
+  const getFieldError = (fieldName) => {
+    return validationErrors[fieldName] ? 'border-red-300' : '';
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -180,10 +235,14 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                   type="text"
                   name="name"
                   required
-                  className="form-input"
+                  className={`form-input ${getFieldError('name')}`}
                   value={formData.name}
                   onChange={handleChange}
+                  placeholder="Enter item name"
                 />
+                {validationErrors.name && (
+                  <p className="text-red-500 text-xs mt-1">{validationErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -194,10 +253,14 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                   type="text"
                   name="sku"
                   required
-                  className="form-input"
+                  className={`form-input ${getFieldError('sku')}`}
                   value={formData.sku}
                   onChange={handleChange}
+                  placeholder="Enter unique SKU"
                 />
+                {validationErrors.sku && (
+                  <p className="text-red-500 text-xs mt-1">{validationErrors.sku}</p>
+                )}
               </div>
             </div>
 
@@ -211,6 +274,7 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                 className="form-input"
                 value={formData.description}
                 onChange={handleChange}
+                placeholder="Enter item description"
               />
             </div>
 
@@ -365,10 +429,14 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                   type="number"
                   name="quantity"
                   min="0"
-                  className="form-input"
+                  step="0.01"
+                  className={`form-input ${getFieldError('quantity')}`}
                   value={formData.quantity}
                   onChange={handleChange}
                 />
+                {validationErrors.quantity && (
+                  <p className="text-red-500 text-xs mt-1">{validationErrors.quantity}</p>
+                )}
               </div>
 
               <div>
@@ -379,10 +447,14 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                   type="number"
                   name="min_quantity"
                   min="0"
-                  className="form-input"
+                  step="0.01"
+                  className={`form-input ${getFieldError('min_quantity')}`}
                   value={formData.min_quantity}
                   onChange={handleChange}
                 />
+                {validationErrors.min_quantity && (
+                  <p className="text-red-500 text-xs mt-1">{validationErrors.min_quantity}</p>
+                )}
               </div>
 
               <div>
@@ -393,10 +465,14 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                   type="number"
                   name="max_quantity"
                   min="0"
-                  className="form-input"
+                  step="0.01"
+                  className={`form-input ${getFieldError('max_quantity')}`}
                   value={formData.max_quantity}
                   onChange={handleChange}
                 />
+                {validationErrors.max_quantity && (
+                  <p className="text-red-500 text-xs mt-1">{validationErrors.max_quantity}</p>
+                )}
               </div>
             </div>
 
@@ -409,14 +485,41 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                 name="unit_price"
                 min="0"
                 step="0.01"
-                className="form-input"
+                className={`form-input ${getFieldError('unit_price')}`}
                 value={formData.unit_price}
                 onChange={handleChange}
               />
               <p className="text-xs text-gray-500 mt-1">
                 Price per base unit
               </p>
+              {validationErrors.unit_price && (
+                <p className="text-red-500 text-xs mt-1">{validationErrors.unit_price}</p>
+              )}
             </div>
+
+            {/* Total Value Preview */}
+            {formData.quantity > 0 && formData.unit_price > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <Info className="h-4 w-4 text-green-500 mr-2" />
+                  <span className="text-sm font-medium text-green-900">
+                    Total Value: ${(formData.quantity * formData.unit_price).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Stock Level Warning */}
+            {formData.quantity > 0 && formData.min_quantity > 0 && formData.quantity <= formData.min_quantity && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2" />
+                  <span className="text-sm font-medium text-yellow-900">
+                    Warning: Current quantity is at or below minimum stock level
+                  </span>
+                </div>
+              </div>
+            )}
           </form>
         </div>
 

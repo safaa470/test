@@ -20,7 +20,11 @@ import {
   ArrowRightLeft,
   TrendingUp,
   DollarSign,
-  History
+  History,
+  Filter,
+  SortAsc,
+  SortDesc,
+  RefreshCw
 } from 'lucide-react';
 import InventoryModal from './modals/InventoryModal';
 import CategoryModal from './modals/CategoryModal';
@@ -39,6 +43,7 @@ const Inventory = () => {
   const [filteredItems, setFilteredItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
@@ -54,6 +59,10 @@ const Inventory = () => {
   const [units, setUnits] = useState([]);
   const [locations, setLocations] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [stockFilter, setStockFilter] = useState('all');
   const { confirmationState, showConfirmation, hideConfirmation } = useConfirmation();
 
   useEffect(() => {
@@ -62,13 +71,52 @@ const Inventory = () => {
   }, []);
 
   useEffect(() => {
-    const filtered = items.filter(item =>
+    let filtered = items.filter(item =>
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.category_name && item.category_name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
+
+    // Apply category filter
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(item => item.category_id == categoryFilter);
+    }
+
+    // Apply stock filter
+    if (stockFilter === 'low') {
+      filtered = filtered.filter(item => item.quantity <= item.min_quantity);
+    } else if (stockFilter === 'out') {
+      filtered = filtered.filter(item => item.quantity === 0);
+    } else if (stockFilter === 'good') {
+      filtered = filtered.filter(item => item.quantity > item.min_quantity);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+      
+      // Handle numeric fields
+      if (['quantity', 'min_quantity', 'max_quantity', 'unit_price', 'total_value'].includes(sortField)) {
+        aValue = parseFloat(aValue) || 0;
+        bValue = parseFloat(bValue) || 0;
+      }
+      
+      // Handle string fields
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
     setFilteredItems(filtered);
-  }, [items, searchTerm]);
+  }, [items, searchTerm, categoryFilter, stockFilter, sortField, sortDirection]);
 
   const fetchInventory = async () => {
     try {
@@ -78,6 +126,18 @@ const Inventory = () => {
       toast.error('Error fetching inventory');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshInventory = async () => {
+    setRefreshing(true);
+    try {
+      await fetchInventory();
+      toast.success('Inventory refreshed');
+    } catch (error) {
+      toast.error('Error refreshing inventory');
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -135,6 +195,20 @@ const Inventory = () => {
     setShowPurchaseHistoryModal(true);
   };
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? <SortAsc className="h-3 w-3" /> : <SortDesc className="h-3 w-3" />;
+  };
+
   const handleExport = async () => {
     try {
       const response = await axios.get('/api/inventory/export', {
@@ -187,7 +261,8 @@ const Inventory = () => {
     
     doc.setFontSize(12);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
-    doc.text(`Total Items: ${items.length}`, 14, 38);
+    doc.text(`Total Items: ${filteredItems.length}`, 14, 38);
+    doc.text(`Low Stock Items: ${filteredItems.filter(item => item.quantity <= item.min_quantity).length}`, 14, 46);
 
     const tableData = filteredItems.map(item => [
       item.name,
@@ -205,7 +280,7 @@ const Inventory = () => {
     doc.autoTable({
       head: [['Name', 'SKU', 'Category', 'Qty', 'Base Unit', 'Issue Unit', 'Current Price', 'Last Purchase', 'Avg Price', 'Total Value']],
       body: tableData,
-      startY: 45,
+      startY: 55,
       styles: { fontSize: 7 },
       headStyles: { fillColor: [59, 130, 246] }
     });
@@ -221,6 +296,18 @@ const Inventory = () => {
   const handleManageClick = (type) => {
     setManagementType(type);
     setShowManagementModal(true);
+  };
+
+  const getStockStatusColor = (item) => {
+    if (item.quantity === 0) return 'text-red-600';
+    if (item.quantity <= item.min_quantity) return 'text-yellow-600';
+    return 'text-green-600';
+  };
+
+  const getStockStatusIcon = (item) => {
+    if (item.quantity === 0) return <AlertTriangle className="h-4 w-4 text-red-500" />;
+    if (item.quantity <= item.min_quantity) return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+    return null;
   };
 
   if (loading) {
@@ -240,6 +327,15 @@ const Inventory = () => {
         </div>
         
         <div className="flex space-x-3">
+          <button
+            onClick={refreshInventory}
+            disabled={refreshing}
+            className="btn-secondary flex items-center disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          
           <input
             type="file"
             accept=".csv"
@@ -266,6 +362,63 @@ const Inventory = () => {
             <Plus className="h-4 w-4 mr-2" />
             Add Item
           </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-primary-50">
+              <Package className="h-6 w-6 text-primary-500" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Items</p>
+              <p className="text-2xl font-bold text-gray-900">{items.length}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-yellow-50">
+              <AlertTriangle className="h-6 w-6 text-yellow-500" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Low Stock</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {items.filter(item => item.quantity <= item.min_quantity).length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-red-50">
+              <Package className="h-6 w-6 text-red-500" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Out of Stock</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {items.filter(item => item.quantity === 0).length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-green-50">
+              <DollarSign className="h-6 w-6 text-green-500" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Value</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ${items.reduce((sum, item) => sum + (item.total_value || 0), 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -327,15 +480,43 @@ const Inventory = () => {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="p-6 border-b border-gray-200">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Search items by name, SKU, or category..."
-              className="pl-10 form-input"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Search items by name, SKU, or category..."
+                className="pl-10 form-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <select
+                className="form-select"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="form-select"
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+              >
+                <option value="all">All Stock Levels</option>
+                <option value="good">Good Stock</option>
+                <option value="low">Low Stock</option>
+                <option value="out">Out of Stock</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -343,17 +524,41 @@ const Inventory = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Item Details
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('name')}
+                >
+                  <div className="flex items-center">
+                    Item Details
+                    {getSortIcon('name')}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category & Location
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('category_name')}
+                >
+                  <div className="flex items-center">
+                    Category & Location
+                    {getSortIcon('category_name')}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Units & Stock
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('quantity')}
+                >
+                  <div className="flex items-center">
+                    Units & Stock
+                    {getSortIcon('quantity')}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Pricing
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('unit_price')}
+                >
+                  <div className="flex items-center">
+                    Pricing
+                    {getSortIcon('unit_price')}
+                  </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -379,12 +584,10 @@ const Inventory = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className={`text-sm font-medium ${getStockStatusColor(item)}`}>
                         {item.quantity} {item.base_unit_abbr || 'units'}
                       </span>
-                      {item.quantity <= item.min_quantity && (
-                        <AlertTriangle className="h-4 w-4 text-warning-500 ml-2" />
-                      )}
+                      {getStockStatusIcon(item)}
                     </div>
                     <div className="text-xs text-gray-500">
                       Min: {item.min_quantity} | Max: {item.max_quantity}

@@ -299,7 +299,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     return 'bg-green-100 text-green-800';
   };
 
-  // CRITICAL: This function formats the inventory dropdown options with stock info
+  // ENHANCED: This function formats the inventory dropdown options with stock info
   const formatInventoryOption = (invItem) => {
     const stock = invItem.quantity || 0;
     let stockText = `Stock: ${stock}`;
@@ -405,6 +405,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                     className="form-input"
                     value={formData.required_date}
                     onChange={handleChange}
+                    min={new Date().toISOString().split('T')[0]}
                   />
                 </div>
 
