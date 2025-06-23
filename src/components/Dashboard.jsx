@@ -50,7 +50,7 @@ const Dashboard = () => {
         const response = await axios.get(`/api/users/${user.id}/activity`, {
           params: { filter: 'all', days: '7' }
         });
-        setRecentActivity(response.data.slice(0, 5)); // Get last 5 activities
+        setRecentActivity(Array.isArray(response.data) ? response.data.slice(0, 5) : []); // Get last 5 activities
       }
     } catch (error) {
       console.error('Error fetching recent activity:', error);

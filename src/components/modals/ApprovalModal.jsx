@@ -37,7 +37,7 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
       
       // Initialize approval quantities with requested quantities
       const initialQuantities = {};
-      response.data.items.forEach(item => {
+      (response.data.items || []).forEach(item => {
         initialQuantities[item.id] = item.quantity_requested;
       });
       setApprovalQuantities(initialQuantities);
@@ -154,22 +154,22 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
   };
 
   const calculateTotalApprovedCost = () => {
-    return details.items.reduce((total, item) => {
+    return (details.items || []).reduce((total, item) => {
       const approvedQty = approvalQuantities[item.id] || 0;
       return total + (approvedQty * (item.estimated_unit_cost || 0));
     }, 0);
   };
 
   const getApprovalSummary = () => {
-    const totalItems = details.items.length;
-    const fullyApprovedItems = details.items.filter(item => 
+    const totalItems = (details.items || []).length;
+    const fullyApprovedItems = (details.items || []).filter(item => 
       (approvalQuantities[item.id] || 0) === item.quantity_requested
     ).length;
-    const partiallyApprovedItems = details.items.filter(item => {
+    const partiallyApprovedItems = (details.items || []).filter(item => {
       const approvedQty = approvalQuantities[item.id] || 0;
       return approvedQty > 0 && approvedQty < item.quantity_requested;
     }).length;
-    const rejectedItems = details.items.filter(item => 
+    const rejectedItems = (details.items || []).filter(item => 
       (approvalQuantities[item.id] || 0) === 0
     ).length;
 
@@ -295,7 +295,7 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
                 </div>
                 
                 <div className="space-y-4">
-                  {details.items.map((item, index) => {
+                  {(details.items || []).map((item, index) => {
                     const approvedQty = approvalQuantities[item.id] || 0;
                     const isPartial = approvedQty > 0 && approvedQty < item.quantity_requested;
                     const isRejected = approvedQty === 0;
@@ -560,12 +560,12 @@ const ApprovalModal = ({ requisition, onClose, onSuccess }) => {
               </div>
 
               {/* Previous Approvals */}
-              {details.approvals.length > 0 && (
+              {(details.approvals || []).length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Previous Approvals</h3>
                   
                   <div className="space-y-3">
-                    {details.approvals.map((approval, index) => (
+                    {(details.approvals || []).map((approval, index) => (
                       <div key={approval.id || index} className="flex items-start space-x-3">
                         <div className="flex-shrink-0 mt-1">
                           {approval.action === 'approved' ? (

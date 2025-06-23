@@ -38,7 +38,7 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
       
       // Initialize issue quantities with requested quantities
       const initialQuantities = {};
-      response.data.items.forEach(item => {
+      (response.data.items || []).forEach(item => {
         initialQuantities[item.id] = item.quantity_requested - (item.quantity_fulfilled || 0);
       });
       setIssueQuantities(initialQuantities);
@@ -55,7 +55,7 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
     try {
       const issueData = {
         issue_type: issueType,
-        items: details.items.map(item => ({
+        items: (details.items || []).map(item => ({
           id: item.id,
           quantity_to_issue: issueType === 'full' 
             ? item.quantity_requested - (item.quantity_fulfilled || 0)
@@ -159,7 +159,7 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
 
   const canIssueItems = () => {
     return details && details.status === 'approved' && 
-           details.items.some(item => (item.quantity_fulfilled || 0) < item.quantity_requested);
+           (details.items || []).some(item => (item.quantity_fulfilled || 0) < item.quantity_requested);
   };
 
   const getItemFulfillmentStatus = (item) => {
@@ -311,7 +311,7 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Items for Review</h3>
                 
                 <div className="space-y-4">
-                  {details.items.map((item, index) => {
+                  {(details.items || []).map((item, index) => {
                     const fulfillmentStatus = getItemFulfillmentStatus(item);
                     const remainingQty = item.quantity_requested - (item.quantity_fulfilled || 0);
                     
@@ -421,7 +421,7 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
                 </div>
 
                 {/* Purchase Order Notice */}
-                {details.items.some(item => item.needs_purchase) && (
+                {(details.items || []).some(item => item.needs_purchase) && (
                   <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <div className="flex items-start">
                       <ShoppingCart className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
@@ -461,17 +461,17 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
               </div>
 
               {/* Workflow Progress */}
-              {details.workflowSteps && details.workflowSteps.length > 0 && (
+              {(details.workflowSteps || []).length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Approval Workflow</h3>
                   
                   <div className="space-y-4">
-                    {details.workflowSteps.map((step, index) => {
+                    {(details.workflowSteps || []).map((step, index) => {
                       const isCurrentStep = step.step_order === details.current_step;
-                      const isCompleted = details.approvals.some(approval => 
+                      const isCompleted = (details.approvals || []).some(approval => 
                         approval.workflow_step_id === step.id && approval.action === 'approved'
                       );
-                      const isRejected = details.approvals.some(approval => 
+                      const isRejected = (details.approvals || []).some(approval => 
                         approval.workflow_step_id === step.id && approval.action === 'rejected'
                       );
                       
@@ -511,12 +511,12 @@ const RequisitionViewModal = ({ requisition, onClose, onSuccess }) => {
               )}
 
               {/* Previous Approvals */}
-              {details.approvals.length > 0 && (
+              {(details.approvals || []).length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Approval History</h3>
                   
                   <div className="space-y-4">
-                    {details.approvals.map((approval, index) => (
+                    {(details.approvals || []).map((approval, index) => (
                       <div key={approval.id || index} className="border-l-4 border-gray-200 pl-4">
                         <div className="flex items-start">
                           <div className="flex-shrink-0 mt-1">
