@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const DatabaseMigrator = require('./database/migrator');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -12,10 +11,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize database
+// Initialize database using dynamic import for ES module
 async function initializeDatabase() {
   try {
     console.log('🔄 Initializing database...');
+    const { default: DatabaseMigrator } = await import('./database/migrator.js');
     const migrator = new DatabaseMigrator();
     await migrator.runMigrations();
     migrator.close();
