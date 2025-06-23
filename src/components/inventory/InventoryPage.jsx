@@ -39,6 +39,7 @@ const InventoryPage = () => {
   const { confirmationState, showConfirmation, hideConfirmation } = useConfirmation();
 
   useEffect(() => {
+    console.log('🔄 InventoryPage mounted, fetching data...');
     fetchInventory();
     fetchDropdownData();
   }, []);
@@ -48,13 +49,36 @@ const InventoryPage = () => {
   }, [items, searchTerm, categoryFilter, stockFilter, sortField, sortDirection]);
 
   const fetchInventory = async () => {
+    console.log('📡 Fetching inventory from API...');
     try {
       const response = await axios.get('/api/inventory');
+      console.log('📊 API Response:', {
+        status: response.status,
+        dataType: typeof response.data,
+        isArray: Array.isArray(response.data),
+        length: Array.isArray(response.data) ? response.data.length : 'N/A'
+      });
+      
       // Ensure response.data is always an array
       const inventoryData = Array.isArray(response.data) ? response.data : [];
+      console.log('📦 Setting inventory items:', inventoryData.length, 'items');
+      
+      // Log first few items for debugging
+      if (inventoryData.length > 0) {
+        console.log('📋 Sample items:', inventoryData.slice(0, 3).map(item => ({
+          id: item.id,
+          name: item.name,
+          sku: item.sku,
+          quantity: item.quantity
+        })));
+      } else {
+        console.log('⚠️ No inventory items received from API');
+      }
+      
       setItems(inventoryData);
     } catch (error) {
-      toast.error('Error fetching inventory');
+      console.error('❌ Error fetching inventory:', error);
+      toast.error('Error fetching inventory: ' + (error.response?.data?.error || error.message));
       setItems([]);
     } finally {
       setLoading(false);
@@ -75,6 +99,7 @@ const InventoryPage = () => {
 
   const fetchDropdownData = async () => {
     try {
+      console.log('📡 Fetching dropdown data...');
       const [categoriesRes, unitsRes, locationsRes, suppliersRes] = await Promise.all([
         axios.get('/api/categories').catch(() => ({ data: [] })),
         axios.get('/api/units').catch(() => ({ data: [] })),
@@ -87,7 +112,15 @@ const InventoryPage = () => {
       setUnits(Array.isArray(unitsRes.data) ? unitsRes.data : []);
       setLocations(Array.isArray(locationsRes.data) ? locationsRes.data : []);
       setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
+      
+      console.log('📊 Dropdown data loaded:', {
+        categories: categoriesRes.data.length,
+        units: unitsRes.data.length,
+        locations: locationsRes.data.length,
+        suppliers: suppliersRes.data.length
+      });
     } catch (error) {
+      console.error('❌ Error fetching dropdown data:', error);
       toast.error('Error fetching dropdown data');
       // Set fallback empty arrays
       setCategories([]);
@@ -100,6 +133,7 @@ const InventoryPage = () => {
   const filterAndSortItems = () => {
     // Ensure items is always an array before filtering
     const itemsArray = Array.isArray(items) ? items : [];
+    console.log('🔍 Filtering items:', itemsArray.length, 'total items');
     
     let filtered = itemsArray.filter(item =>
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -145,6 +179,7 @@ const InventoryPage = () => {
       }
     });
 
+    console.log('📋 Filtered items:', filtered.length, 'items after filtering');
     setFilteredItems(filtered);
   };
 
@@ -192,6 +227,7 @@ const InventoryPage = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+        <span className="ml-3 text-gray-600">Loading inventory...</span>
       </div>
     );
   }
@@ -201,7 +237,12 @@ const InventoryPage = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
-          <p className="text-gray-600 mt-2">Manage your warehouse items and settings</p>
+          <p className="text-gray-600 mt-2">
+            Manage your warehouse items and settings 
+            {Array.isArray(items) && items.length > 0 && (
+              <span className="text-primary-600 font-medium"> • {items.length} items loaded</span>
+            )}
+          </p>
         </div>
         
         <div className="flex space-x-3">
@@ -261,6 +302,17 @@ const InventoryPage = () => {
           onViewPurchaseHistory={handleViewPurchaseHistory}
         />
       </div>
+
+      {/* Debug Information */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-gray-100 rounded-lg p-4 text-xs text-gray-600">
+          <strong>Debug Info:</strong> 
+          Items: {Array.isArray(items) ? items.length : 'Not array'} | 
+          Filtered: {Array.isArray(filteredItems) ? filteredItems.length : 'Not array'} | 
+          Categories: {Array.isArray(categories) ? categories.length : 'Not array'} | 
+          Loading: {loading ? 'Yes' : 'No'}
+        </div>
+      )}
 
       <InventoryModals
         showModal={showModal}
