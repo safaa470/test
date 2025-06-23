@@ -35,9 +35,13 @@ const DepartmentManagementModal = ({ onClose, onSuccess }) => {
   const fetchDepartments = async () => {
     try {
       const response = await axios.get('/api/departments/all');
-      setDepartments(response.data);
+      // Ensure response.data is an array before setting state
+      const departmentsData = Array.isArray(response.data) ? response.data : [];
+      setDepartments(departmentsData);
     } catch (error) {
       toast.error('Error fetching departments');
+      // Set empty array on error to prevent map errors
+      setDepartments([]);
     } finally {
       setLoading(false);
     }

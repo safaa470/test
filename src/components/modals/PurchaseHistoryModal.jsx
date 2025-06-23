@@ -25,9 +25,13 @@ const PurchaseHistoryModal = ({ itemId, onClose, onSuccess }) => {
   const fetchPurchaseHistory = async () => {
     try {
       const response = await axios.get(`/api/inventory/${itemId}/purchases`);
-      setPurchaseHistory(response.data);
+      // Ensure response.data is an array before setting state
+      const historyData = Array.isArray(response.data) ? response.data : [];
+      setPurchaseHistory(historyData);
     } catch (error) {
       toast.error('Error fetching purchase history');
+      // Set empty array on error to prevent map errors
+      setPurchaseHistory([]);
     } finally {
       setLoading(false);
     }
@@ -36,9 +40,13 @@ const PurchaseHistoryModal = ({ itemId, onClose, onSuccess }) => {
   const fetchSuppliers = async () => {
     try {
       const response = await axios.get('/api/suppliers');
-      setSuppliers(response.data);
+      // Ensure response.data is an array before setting state
+      const suppliersData = Array.isArray(response.data) ? response.data : [];
+      setSuppliers(suppliersData);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
+      // Set empty array on error to prevent map errors
+      setSuppliers([]);
     }
   };
 
