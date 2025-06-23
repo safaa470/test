@@ -55,10 +55,10 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     try {
       console.log('📡 Fetching dropdown data...');
       const [inventoryRes, unitsRes, workflowsRes, departmentsRes] = await Promise.all([
-        axios.get('/api/inventory'),
-        axios.get('/api/units'),
-        axios.get('/api/workflows').catch(() => ({ data: [] })), // Graceful fallback
-        axios.get('/api/departments').catch(() => ({ data: [] })) // Graceful fallback
+        axios.get('/api/inventory').catch(() => ({ data: [] })),
+        axios.get('/api/units').catch(() => ({ data: [] })),
+        axios.get('/api/workflows').catch(() => ({ data: [] })),
+        axios.get('/api/departments').catch(() => ({ data: [] }))
       ]);
 
       console.log('📦 Inventory data received:', inventoryRes.data.length, 'items');
@@ -69,12 +69,12 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         console.log('📋 Sample inventory item:', inventoryRes.data[0]);
       }
 
-      setInventory(inventoryRes.data);
-      setUnits(unitsRes.data);
-      setDepartments(departmentsRes.data);
+      setInventory(Array.isArray(inventoryRes.data) ? inventoryRes.data : []);
+      setUnits(Array.isArray(unitsRes.data) ? unitsRes.data : []);
+      setDepartments(Array.isArray(departmentsRes.data) ? departmentsRes.data : []);
       
       // Use workflows from API or fallback to static ones
-      if (workflowsRes.data && workflowsRes.data.length > 0) {
+      if (workflowsRes.data && Array.isArray(workflowsRes.data) && workflowsRes.data.length > 0) {
         setWorkflows(workflowsRes.data);
       } else {
         // Fallback to static workflows if API fails
@@ -87,6 +87,9 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     } catch (error) {
       console.error('❌ Error fetching dropdown data:', error);
       // Set fallback data
+      setInventory([]);
+      setUnits([]);
+      setDepartments([]);
       setWorkflows([
         { id: 1, name: 'Standard Approval' },
         { id: 2, name: 'High Value Approval' },
@@ -100,7 +103,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     
     try {
       const response = await axios.get(`/api/requisitions/${requisition.id}`);
-      if (response.data.items && response.data.items.length > 0) {
+      if (response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0) {
         setItems(response.data.items.map(item => ({
           id: item.id,
           inventory_id: item.inventory_id || '',

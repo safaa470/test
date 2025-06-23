@@ -50,9 +50,10 @@ const InventoryPage = () => {
   const fetchInventory = async () => {
     try {
       const response = await axios.get('/api/inventory');
-      setItems(response.data);
+      setItems(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       toast.error('Error fetching inventory');
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -73,18 +74,23 @@ const InventoryPage = () => {
   const fetchDropdownData = async () => {
     try {
       const [categoriesRes, unitsRes, locationsRes, suppliersRes] = await Promise.all([
-        axios.get('/api/categories'),
-        axios.get('/api/units'),
-        axios.get('/api/locations'),
-        axios.get('/api/suppliers')
+        axios.get('/api/categories').catch(() => ({ data: [] })),
+        axios.get('/api/units').catch(() => ({ data: [] })),
+        axios.get('/api/locations').catch(() => ({ data: [] })),
+        axios.get('/api/suppliers').catch(() => ({ data: [] }))
       ]);
 
-      setCategories(categoriesRes.data);
-      setUnits(unitsRes.data);
-      setLocations(locationsRes.data);
-      setSuppliers(suppliersRes.data);
+      setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
+      setUnits(Array.isArray(unitsRes.data) ? unitsRes.data : []);
+      setLocations(Array.isArray(locationsRes.data) ? locationsRes.data : []);
+      setSuppliers(Array.isArray(suppliersRes.data) ? suppliersRes.data : []);
     } catch (error) {
       toast.error('Error fetching dropdown data');
+      // Set fallback empty arrays
+      setCategories([]);
+      setUnits([]);
+      setLocations([]);
+      setSuppliers([]);
     }
   };
 
