@@ -29,18 +29,40 @@ const Dashboard = () => {
   const fetchStats = async () => {
     try {
       const response = await axios.get('/api/dashboard/stats');
-      setStats(response.data);
+      setStats(response.data || {
+        totalItems: 0,
+        lowStockItems: 0,
+        totalValue: 0,
+        totalCategories: 0
+      });
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setStats({
+        totalItems: 0,
+        lowStockItems: 0,
+        totalValue: 0,
+        totalCategories: 0
+      });
     }
   };
 
   const fetchRequisitionStats = async () => {
     try {
       const response = await axios.get('/api/requisitions/stats/dashboard');
-      setRequisitionStats(response.data);
+      setRequisitionStats(response.data || {
+        totalRequisitions: 0,
+        pendingApprovals: 0,
+        myRequisitions: 0,
+        approvedThisMonth: 0
+      });
     } catch (error) {
       console.error('Error fetching requisition stats:', error);
+      setRequisitionStats({
+        totalRequisitions: 0,
+        pendingApprovals: 0,
+        myRequisitions: 0,
+        approvedThisMonth: 0
+      });
     }
   };
 
@@ -50,10 +72,13 @@ const Dashboard = () => {
         const response = await axios.get(`/api/users/${user.id}/activity`, {
           params: { filter: 'all', days: '7' }
         });
-        setRecentActivity(Array.isArray(response.data) ? response.data.slice(0, 5) : []); // Get last 5 activities
+        // Ensure response.data is an array before setting state
+        const activityData = Array.isArray(response.data) ? response.data.slice(0, 5) : [];
+        setRecentActivity(activityData);
       }
     } catch (error) {
       console.error('Error fetching recent activity:', error);
+      setRecentActivity([]);
     } finally {
       setLoading(false);
     }
@@ -247,7 +272,7 @@ const Dashboard = () => {
         {/* Recent Activity */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-          {recentActivity.length > 0 ? (
+          {Array.isArray(recentActivity) && recentActivity.length > 0 ? (
             <div className="space-y-3">
               {recentActivity.map((activity, index) => (
                 <div key={activity.id || index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">

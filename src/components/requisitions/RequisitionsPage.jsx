@@ -55,9 +55,10 @@ const RequisitionsPage = () => {
   const fetchStats = async () => {
     try {
       const response = await axios.get('/api/requisitions/stats/dashboard');
-      setStats(response.data);
+      setStats(response.data || {});
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setStats({});
     }
   };
 
@@ -197,7 +198,7 @@ const RequisitionsPage = () => {
         />
 
         <RequisitionsTable
-          requisitions={filteredRequisitions}
+          requisitions={Array.isArray(filteredRequisitions) ? filteredRequisitions : []}
           onEdit={handleEdit}
           onView={handleView}
           onApprove={handleApprove}

@@ -34,7 +34,9 @@ const UserManagementPage = () => {
   const fetchUsers = async () => {
     try {
       const response = await axios.get('/api/users');
-      setUsers(Array.isArray(response.data) ? response.data : []);
+      // Ensure response.data is always an array
+      const usersData = Array.isArray(response.data) ? response.data : [];
+      setUsers(usersData);
     } catch (error) {
       toast.error('Error fetching users');
       setUsers([]);
@@ -44,7 +46,10 @@ const UserManagementPage = () => {
   };
 
   const filterUsers = () => {
-    let filtered = users.filter(user =>
+    // Ensure users is always an array before filtering
+    const usersArray = Array.isArray(users) ? users : [];
+    
+    let filtered = usersArray.filter(user =>
       user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.role.toLowerCase().includes(searchTerm.toLowerCase())
@@ -145,7 +150,7 @@ const UserManagementPage = () => {
         </button>
       </div>
 
-      <UserStats users={users} />
+      <UserStats users={Array.isArray(users) ? users : []} />
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <UserFilters
@@ -156,7 +161,7 @@ const UserManagementPage = () => {
         />
 
         <UserTable
-          users={filteredUsers}
+          users={Array.isArray(filteredUsers) ? filteredUsers : []}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onToggleStatus={handleToggleStatus}

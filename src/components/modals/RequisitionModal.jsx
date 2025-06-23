@@ -69,6 +69,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         console.log('📋 Sample inventory item:', inventoryRes.data[0]);
       }
 
+      // Ensure all responses are arrays before setting state
       setInventory(Array.isArray(inventoryRes.data) ? inventoryRes.data : []);
       setUnits(Array.isArray(unitsRes.data) ? unitsRes.data : []);
       setDepartments(Array.isArray(departmentsRes.data) ? departmentsRes.data : []);
@@ -154,15 +155,18 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     e.preventDefault();
     setLoading(true);
 
-    if (items.length === 0) {
+    // Ensure items is always an array
+    const itemsArray = Array.isArray(items) ? items : [];
+
+    if (itemsArray.length === 0) {
       toast.error('At least one item is required');
       setLoading(false);
       return;
     }
 
     // Validate items
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+    for (let i = 0; i < itemsArray.length; i++) {
+      const item = itemsArray[i];
       if (!item.item_name.trim()) {
         toast.error(`Item ${i + 1}: Name is required`);
         setLoading(false);
@@ -178,7 +182,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     try {
       const submitData = {
         ...formData,
-        items: items.map(item => ({
+        items: itemsArray.map(item => ({
           ...item,
           quantity_requested: parseInt(item.quantity_requested),
           estimated_unit_cost: parseFloat(item.estimated_unit_cost) || 0
@@ -233,12 +237,15 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
   };
 
   const handleItemChange = (index, field, value) => {
-    const newItems = [...items];
+    // Ensure items is always an array
+    const itemsArray = Array.isArray(items) ? items : [];
+    const newItems = [...itemsArray];
     newItems[index] = { ...newItems[index], [field]: value };
     
     // Auto-fill item details when inventory item is selected
     if (field === 'inventory_id' && value) {
-      const inventoryItem = inventory.find(item => item.id == value);
+      const inventoryArray = Array.isArray(inventory) ? inventory : [];
+      const inventoryItem = inventoryArray.find(item => item.id == value);
       if (inventoryItem) {
         console.log('🎯 Selected inventory item:', inventoryItem);
         newItems[index].item_name = inventoryItem.name;
@@ -270,7 +277,8 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
   };
 
   const addItem = () => {
-    setItems([...items, {
+    const itemsArray = Array.isArray(items) ? items : [];
+    setItems([...itemsArray, {
       inventory_id: '',
       item_name: '',
       item_description: '',
@@ -285,13 +293,15 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
   };
 
   const removeItem = (index) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
+    const itemsArray = Array.isArray(items) ? items : [];
+    if (itemsArray.length > 1) {
+      setItems(itemsArray.filter((_, i) => i !== index));
     }
   };
 
   const calculateTotalCost = () => {
-    return items.reduce((total, item) => 
+    const itemsArray = Array.isArray(items) ? items : [];
+    return itemsArray.reduce((total, item) => 
       total + (item.quantity_requested * (item.estimated_unit_cost || 0)), 0
     );
   };
@@ -343,8 +353,15 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     return `${invItem.name} (${invItem.sku}) - ${stockText}`;
   };
 
-  console.log('🔍 Current inventory count:', inventory.length);
-  console.log('🔍 Current departments count:', departments.length);
+  // Ensure all arrays are properly initialized
+  const inventoryArray = Array.isArray(inventory) ? inventory : [];
+  const unitsArray = Array.isArray(units) ? units : [];
+  const departmentsArray = Array.isArray(departments) ? departments : [];
+  const workflowsArray = Array.isArray(workflows) ? workflows : [];
+  const itemsArray = Array.isArray(items) ? items : [];
+
+  console.log('🔍 Current inventory count:', inventoryArray.length);
+  console.log('🔍 Current departments count:', departmentsArray.length);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -396,14 +413,14 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                     onChange={handleChange}
                   >
                     <option value="">Select Department</option>
-                    {departments.map(dept => (
+                    {departmentsArray.map(dept => (
                       <option key={dept.id} value={dept.name}>
                         {dept.name}
                       </option>
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Select the requesting department ({departments.length} available)
+                    Select the requesting department ({departmentsArray.length} available)
                   </p>
                 </div>
 
@@ -449,7 +466,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                     value={formData.workflow_id}
                     onChange={handleChange}
                   >
-                    {workflows.map(workflow => (
+                    {workflowsArray.map(workflow => (
                       <option key={workflow.id} value={workflow.id}>
                         {workflow.name}
                       </option>
@@ -502,14 +519,14 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
               </div>
 
               <div className="space-y-4">
-                {items.map((item, index) => {
+                {itemsArray.map((item, index) => {
                   const stockStatus = getStockStatus(item);
                   
                   return (
                     <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-medium text-gray-900">Item {index + 1}</h4>
-                        {items.length > 1 && (
+                        {itemsArray.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
@@ -531,7 +548,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                             onChange={(e) => handleItemChange(index, 'inventory_id', e.target.value)}
                           >
                             <option value="">Select from inventory (optional)</option>
-                            {inventory.map(invItem => (
+                            {inventoryArray.map(invItem => (
                               <option key={invItem.id} value={invItem.id}>
                                 {formatInventoryOption(invItem)}
                               </option>
@@ -540,7 +557,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                           {item.inventory_id && (
                             <div className="mt-2">
                               {(() => {
-                                const selectedItem = inventory.find(inv => inv.id == item.inventory_id);
+                                const selectedItem = inventoryArray.find(inv => inv.id == item.inventory_id);
                                 if (selectedItem) {
                                   const stock = selectedItem.quantity || 0;
                                   return (
@@ -605,7 +622,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                             onChange={(e) => handleItemChange(index, 'unit_id', e.target.value)}
                           >
                             <option value="">Select unit</option>
-                            {units.map(unit => (
+                            {unitsArray.map(unit => (
                               <option key={unit.id} value={unit.id}>
                                 {unit.name} ({unit.abbreviation})
                               </option>
@@ -701,7 +718,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
               </div>
 
               {/* Purchase Order Notice */}
-              {items.some(item => item.needs_purchase) && (
+              {itemsArray.some(item => item.needs_purchase) && (
                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <div className="flex items-start">
                     <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
@@ -719,7 +736,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
 
             {/* Debug Info */}
             <div className="bg-gray-100 rounded-lg p-4 text-xs text-gray-600">
-              <strong>Debug Info:</strong> Inventory: {inventory.length} items | Departments: {departments.length} | Units: {units.length}
+              <strong>Debug Info:</strong> Inventory: {inventoryArray.length} items | Departments: {departmentsArray.length} | Units: {unitsArray.length}
             </div>
           </form>
         </div>

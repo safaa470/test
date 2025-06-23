@@ -50,7 +50,9 @@ const InventoryPage = () => {
   const fetchInventory = async () => {
     try {
       const response = await axios.get('/api/inventory');
-      setItems(Array.isArray(response.data) ? response.data : []);
+      // Ensure response.data is always an array
+      const inventoryData = Array.isArray(response.data) ? response.data : [];
+      setItems(inventoryData);
     } catch (error) {
       toast.error('Error fetching inventory');
       setItems([]);
@@ -80,6 +82,7 @@ const InventoryPage = () => {
         axios.get('/api/suppliers').catch(() => ({ data: [] }))
       ]);
 
+      // Ensure all responses are arrays before setting state
       setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
       setUnits(Array.isArray(unitsRes.data) ? unitsRes.data : []);
       setLocations(Array.isArray(locationsRes.data) ? locationsRes.data : []);
@@ -95,7 +98,10 @@ const InventoryPage = () => {
   };
 
   const filterAndSortItems = () => {
-    let filtered = items.filter(item =>
+    // Ensure items is always an array before filtering
+    const itemsArray = Array.isArray(items) ? items : [];
+    
+    let filtered = itemsArray.filter(item =>
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.category_name && item.category_name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -215,7 +221,7 @@ const InventoryPage = () => {
         </div>
       </div>
 
-      <InventoryStats items={items} />
+      <InventoryStats items={Array.isArray(items) ? items : []} />
 
       <InventoryActions
         onImport={fetchInventory}
@@ -235,11 +241,11 @@ const InventoryPage = () => {
           setCategoryFilter={setCategoryFilter}
           stockFilter={stockFilter}
           setStockFilter={setStockFilter}
-          categories={categories}
+          categories={Array.isArray(categories) ? categories : []}
         />
 
         <InventoryTable
-          items={filteredItems}
+          items={Array.isArray(filteredItems) ? filteredItems : []}
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={(field) => {
@@ -275,10 +281,10 @@ const InventoryPage = () => {
         setShowPurchaseHistoryModal={setShowPurchaseHistoryModal}
         editingItem={editingItem}
         selectedItemId={selectedItemId}
-        categories={categories}
-        units={units}
-        locations={locations}
-        suppliers={suppliers}
+        categories={Array.isArray(categories) ? categories : []}
+        units={Array.isArray(units) ? units : []}
+        locations={Array.isArray(locations) ? locations : []}
+        suppliers={Array.isArray(suppliers) ? suppliers : []}
         onSuccess={handleModalSuccess}
         confirmationState={confirmationState}
         hideConfirmation={hideConfirmation}
