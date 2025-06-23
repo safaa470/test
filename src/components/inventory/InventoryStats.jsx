@@ -2,10 +2,13 @@ import React from 'react';
 import { Package, AlertTriangle, DollarSign } from 'lucide-react';
 
 const InventoryStats = ({ items }) => {
-  const totalItems = items.length;
-  const lowStockItems = items.filter(item => item.quantity <= item.min_quantity).length;
-  const outOfStockItems = items.filter(item => item.quantity === 0).length;
-  const totalValue = items.reduce((sum, item) => sum + (item.total_value || 0), 0);
+  // Ensure items is always an array
+  const itemsArray = Array.isArray(items) ? items : [];
+  
+  const totalItems = itemsArray.length;
+  const lowStockItems = itemsArray.filter(item => item.quantity <= item.min_quantity).length;
+  const outOfStockItems = itemsArray.filter(item => item.quantity === 0).length;
+  const totalValue = itemsArray.reduce((sum, item) => sum + (item.total_value || 0), 0);
 
   const statCards = [
     {

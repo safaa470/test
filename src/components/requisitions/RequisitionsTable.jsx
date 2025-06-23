@@ -24,6 +24,9 @@ const RequisitionsTable = ({
   canSubmit, 
   canApprove 
 }) => {
+  // Ensure requisitions is always an array
+  const requisitionsArray = Array.isArray(requisitions) ? requisitions : [];
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'draft':
@@ -108,7 +111,7 @@ const RequisitionsTable = ({
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {requisitions.map((requisition) => (
+          {requisitionsArray.map((requisition) => (
             <tr key={requisition.id} className="hover:bg-gray-50">
               <td className="px-6 py-4">
                 <div>
@@ -212,7 +215,7 @@ const RequisitionsTable = ({
         </tbody>
       </table>
 
-      {requisitions.length === 0 && (
+      {requisitionsArray.length === 0 && (
         <div className="text-center py-12">
           <FileText className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No requisitions found</h3>

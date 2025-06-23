@@ -21,6 +21,9 @@ const InventoryTable = ({
   onDelete, 
   onViewPurchaseHistory 
 }) => {
+  // Ensure items is always an array
+  const itemsArray = Array.isArray(items) ? items : [];
+
   const getSortIcon = (field) => {
     if (sortField !== field) return null;
     return sortDirection === 'asc' ? <SortAsc className="h-3 w-3" /> : <SortDesc className="h-3 w-3" />;
@@ -85,7 +88,7 @@ const InventoryTable = ({
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {items.map((item) => (
+          {itemsArray.map((item) => (
             <tr key={item.id} className="hover:bg-gray-50">
               <td className="px-6 py-4">
                 <div>
@@ -170,7 +173,7 @@ const InventoryTable = ({
         </tbody>
       </table>
 
-      {items.length === 0 && (
+      {itemsArray.length === 0 && (
         <div className="text-center py-12">
           <Package className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No items found</h3>

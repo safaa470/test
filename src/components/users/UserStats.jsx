@@ -2,10 +2,13 @@ import React from 'react';
 import { User, Shield, UserCheck, Clock } from 'lucide-react';
 
 const UserStats = ({ users }) => {
-  const totalUsers = users.length;
-  const adminUsers = users.filter(u => u.role === 'admin').length;
-  const activeUsers = users.filter(u => u.is_active !== false).length;
-  const recentLogins = users.filter(u => 
+  // Ensure users is always an array
+  const usersArray = Array.isArray(users) ? users : [];
+  
+  const totalUsers = usersArray.length;
+  const adminUsers = usersArray.filter(u => u.role === 'admin').length;
+  const activeUsers = usersArray.filter(u => u.is_active !== false).length;
+  const recentLogins = usersArray.filter(u => 
     u.last_login && new Date(u.last_login) > new Date(Date.now() - 24*60*60*1000)
   ).length;
 

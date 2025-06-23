@@ -16,6 +16,9 @@ const UserTable = ({
   onToggleStatus, 
   onViewActivity 
 }) => {
+  // Ensure users is always an array
+  const usersArray = Array.isArray(users) ? users : [];
+
   const getRoleColor = (role) => {
     switch (role) {
       case 'admin':
@@ -58,7 +61,7 @@ const UserTable = ({
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {users.map((user) => (
+          {usersArray.map((user) => (
             <tr key={user.id} className="hover:bg-gray-50">
               <td className="px-6 py-4">
                 <div className="flex items-center">
@@ -144,7 +147,7 @@ const UserTable = ({
         </tbody>
       </table>
 
-      {users.length === 0 && (
+      {usersArray.length === 0 && (
         <div className="text-center py-12">
           <User className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
