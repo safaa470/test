@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
+const sqlite3 = require('sqlite3').verbose();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -13,9 +13,11 @@ const __dirname = dirname(__filename);
 class DatabaseMigrator {
   constructor() {
     const dbPath = path.join(__dirname, 'warehouse.db');
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
+    this.db = new sqlite3.Database(dbPath);
+    
+    // Enable foreign keys and WAL mode
+    this.db.run('PRAGMA foreign_keys = ON');
+    this.db.run('PRAGMA journal_mode = WAL');
   }
 
   async runMigrations() {
@@ -23,7 +25,7 @@ class DatabaseMigrator {
     
     try {
       // Create schema_migrations table if it doesn't exist
-      this.db.exec(`
+      await this.runQuery(`
         CREATE TABLE IF NOT EXISTS schema_migrations (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           version TEXT UNIQUE NOT NULL,
@@ -42,9 +44,21 @@ class DatabaseMigrator {
     }
   }
 
+  runQuery(sql, params = []) {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, params, function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ lastID: this.lastID, changes: this.changes });
+        }
+      });
+    });
+  }
+
   async createTables() {
     // Users table
-    this.db.exec(`
+    await this.runQuery(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
@@ -62,7 +76,7 @@ class DatabaseMigrator {
     `);
 
     // Categories table
-    this.db.exec(`
+    await this.runQuery(`
       CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -74,7 +88,7 @@ class DatabaseMigrator {
     `);
 
     // Units table
-    this.db.exec(`
+    await this.runQuery(`
       CREATE TABLE IF NOT EXISTS units (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -88,7 +102,7 @@ class DatabaseMigrator {
     `);
 
     // Locations table
-    this.db.exec(`
+    await this.runQuery(`
       CREATE TABLE IF NOT EXISTS locations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -99,7 +113,7 @@ class DatabaseMigrator {
     `);
 
     // Suppliers table
-    this.db.exec(`
+    await this.runQuery(`
       CREATE TABLE IF NOT EXISTS suppliers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -112,7 +126,7 @@ class DatabaseMigrator {
     `);
 
     // Inventory table
-    this.db.exec(`
+    await this.runQuery(`
       CREATE TABLE IF NOT EXISTS inventory (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -144,7 +158,7 @@ class DatabaseMigrator {
     `);
 
     // Purchase history table
-    this.db.exec(`
+    await this.runQuery(`
       CREATE TABLE IF NOT EXISTS purchase_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         inventory_id INTEGER NOT NULL,
@@ -162,7 +176,7 @@ class DatabaseMigrator {
     `);
 
     // User activity table
-    this.db.exec(`
+    await this.runQuery(`
       CREATE TABLE IF NOT EXISTS user_activity (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -177,10 +191,10 @@ class DatabaseMigrator {
     `);
 
     // Create indexes
-    this.createIndexes();
+    await this.createIndexes();
   }
 
-  createIndexes() {
+  async createIndexes() {
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_inventory_sku ON inventory(sku)',
       'CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category_id)',
@@ -191,17 +205,24 @@ class DatabaseMigrator {
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_barcode ON inventory(barcode) WHERE barcode IS NOT NULL'
     ];
 
-    indexes.forEach(indexSql => {
+    for (const indexSql of indexes) {
       try {
-        this.db.exec(indexSql);
+        await this.runQuery(indexSql);
       } catch (error) {
         console.warn('Index creation warning:', error.message);
       }
-    });
+    }
   }
 
   close() {
-    this.db.close();
+    return new Promise((resolve) => {
+      this.db.close((err) => {
+        if (err) {
+          console.error('Error closing database:', err);
+        }
+        resolve();
+      });
+    });
   }
 }
 

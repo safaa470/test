@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,7 +19,7 @@ async function initializeDatabase() {
     const { default: DatabaseMigrator } = await import('./database/migrator.js');
     const migrator = new DatabaseMigrator();
     await migrator.runMigrations();
-    migrator.close();
+    await migrator.close();
     console.log('✅ Database initialized successfully');
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
@@ -63,23 +64,62 @@ setupRoutes();
 // Dashboard stats endpoint
 app.get('/api/dashboard/stats', (req, res) => {
   try {
-    const Database = require('better-sqlite3');
     const dbPath = path.join(__dirname, 'database/warehouse.db');
-    const db = new Database(dbPath);
+    const db = new sqlite3.Database(dbPath);
     
-    const totalItems = db.prepare('SELECT COUNT(*) as count FROM inventory').get().count;
-    const lowStockItems = db.prepare('SELECT COUNT(*) as count FROM inventory WHERE quantity <= min_quantity').get().count;
-    const totalValue = db.prepare('SELECT SUM(total_value) as total FROM inventory').get().total || 0;
-    const totalCategories = db.prepare('SELECT COUNT(*) as count FROM categories').get().count;
+    // Use promises to handle async database operations
+    const getStats = () => {
+      return new Promise((resolve, reject) => {
+        const stats = {
+          totalItems: 0,
+          lowStockItems: 0,
+          totalValue: 0,
+          totalCategories: 0
+        };
+        
+        let completed = 0;
+        const checkComplete = () => {
+          completed++;
+          if (completed === 4) {
+            db.close();
+            resolve(stats);
+          }
+        };
+        
+        db.get('SELECT COUNT(*) as count FROM inventory', (err, row) => {
+          if (!err && row) stats.totalItems = row.count;
+          checkComplete();
+        });
+        
+        db.get('SELECT COUNT(*) as count FROM inventory WHERE quantity <= min_quantity', (err, row) => {
+          if (!err && row) stats.lowStockItems = row.count;
+          checkComplete();
+        });
+        
+        db.get('SELECT SUM(total_value) as total FROM inventory', (err, row) => {
+          if (!err && row) stats.totalValue = row.total || 0;
+          checkComplete();
+        });
+        
+        db.get('SELECT COUNT(*) as count FROM categories', (err, row) => {
+          if (!err && row) stats.totalCategories = row.count;
+          checkComplete();
+        });
+      });
+    };
     
-    db.close();
-    
-    res.json({
-      totalItems,
-      lowStockItems,
-      totalValue,
-      totalCategories
+    getStats().then(stats => {
+      res.json(stats);
+    }).catch(error => {
+      console.error('Error fetching dashboard stats:', error);
+      res.json({
+        totalItems: 0,
+        lowStockItems: 0,
+        totalValue: 0,
+        totalCategories: 0
+      });
     });
+    
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     res.json({
