@@ -19,7 +19,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// Dashboard stats endpoint
+// Placeholder API routes - these will be expanded later
 app.get('/api/dashboard/stats', (req, res) => {
   res.json({
     totalItems: 0,
@@ -29,23 +29,6 @@ app.get('/api/dashboard/stats', (req, res) => {
   });
 });
 
-// User activity endpoint
-app.get('/api/users/:id/activity', (req, res) => {
-  res.json([]);
-});
-
-// Requisitions dashboard stats endpoint
-app.get('/api/requisitions/stats/dashboard', (req, res) => {
-  res.json({
-    totalRequisitions: 0,
-    pendingRequisitions: 0,
-    approvedRequisitions: 0,
-    rejectedRequisitions: 0,
-    totalValue: 0
-  });
-});
-
-// Authentication endpoint
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
   
@@ -63,142 +46,6 @@ app.post('/api/auth/login', (req, res) => {
   } else {
     res.status(401).json({ error: 'Invalid credentials' });
   }
-});
-
-// Inventory endpoints
-app.get('/api/inventory', (req, res) => {
-  res.json([]);
-});
-
-app.post('/api/inventory', (req, res) => {
-  res.json({ id: 1, ...req.body, created_at: new Date().toISOString() });
-});
-
-app.put('/api/inventory/:id', (req, res) => {
-  res.json({ id: parseInt(req.params.id), ...req.body, updated_at: new Date().toISOString() });
-});
-
-app.delete('/api/inventory/:id', (req, res) => {
-  res.json({ message: 'Item deleted successfully' });
-});
-
-// Categories endpoints
-app.get('/api/categories', (req, res) => {
-  res.json([]);
-});
-
-app.post('/api/categories', (req, res) => {
-  res.json({ id: 1, ...req.body, created_at: new Date().toISOString() });
-});
-
-app.put('/api/categories/:id', (req, res) => {
-  res.json({ id: parseInt(req.params.id), ...req.body, updated_at: new Date().toISOString() });
-});
-
-app.delete('/api/categories/:id', (req, res) => {
-  res.json({ message: 'Category deleted successfully' });
-});
-
-// Units endpoints
-app.get('/api/units', (req, res) => {
-  res.json([]);
-});
-
-app.post('/api/units', (req, res) => {
-  res.json({ id: 1, ...req.body, created_at: new Date().toISOString() });
-});
-
-app.put('/api/units/:id', (req, res) => {
-  res.json({ id: parseInt(req.params.id), ...req.body, updated_at: new Date().toISOString() });
-});
-
-app.delete('/api/units/:id', (req, res) => {
-  res.json({ message: 'Unit deleted successfully' });
-});
-
-// Locations endpoints
-app.get('/api/locations', (req, res) => {
-  res.json([]);
-});
-
-app.post('/api/locations', (req, res) => {
-  res.json({ id: 1, ...req.body, created_at: new Date().toISOString() });
-});
-
-app.put('/api/locations/:id', (req, res) => {
-  res.json({ id: parseInt(req.params.id), ...req.body, updated_at: new Date().toISOString() });
-});
-
-app.delete('/api/locations/:id', (req, res) => {
-  res.json({ message: 'Location deleted successfully' });
-});
-
-// Suppliers endpoints
-app.get('/api/suppliers', (req, res) => {
-  res.json([]);
-});
-
-app.post('/api/suppliers', (req, res) => {
-  res.json({ id: 1, ...req.body, created_at: new Date().toISOString() });
-});
-
-app.put('/api/suppliers/:id', (req, res) => {
-  res.json({ id: parseInt(req.params.id), ...req.body, updated_at: new Date().toISOString() });
-});
-
-app.delete('/api/suppliers/:id', (req, res) => {
-  res.json({ message: 'Supplier deleted successfully' });
-});
-
-// Departments endpoints
-app.get('/api/departments', (req, res) => {
-  res.json([]);
-});
-
-app.post('/api/departments', (req, res) => {
-  res.json({ id: 1, ...req.body, created_at: new Date().toISOString() });
-});
-
-app.put('/api/departments/:id', (req, res) => {
-  res.json({ id: parseInt(req.params.id), ...req.body, updated_at: new Date().toISOString() });
-});
-
-app.delete('/api/departments/:id', (req, res) => {
-  res.json({ message: 'Department deleted successfully' });
-});
-
-// Requisitions endpoints
-app.get('/api/requisitions', (req, res) => {
-  res.json([]);
-});
-
-app.post('/api/requisitions', (req, res) => {
-  res.json({ id: 1, ...req.body, created_at: new Date().toISOString() });
-});
-
-app.put('/api/requisitions/:id', (req, res) => {
-  res.json({ id: parseInt(req.params.id), ...req.body, updated_at: new Date().toISOString() });
-});
-
-app.delete('/api/requisitions/:id', (req, res) => {
-  res.json({ message: 'Requisition deleted successfully' });
-});
-
-// Users endpoints
-app.get('/api/users', (req, res) => {
-  res.json([]);
-});
-
-app.post('/api/users', (req, res) => {
-  res.json({ id: 1, ...req.body, created_at: new Date().toISOString() });
-});
-
-app.put('/api/users/:id', (req, res) => {
-  res.json({ id: parseInt(req.params.id), ...req.body, updated_at: new Date().toISOString() });
-});
-
-app.delete('/api/users/:id', (req, res) => {
-  res.json({ message: 'User deleted successfully' });
 });
 
 // Catch-all handler: send back React's index.html file for client-side routing
