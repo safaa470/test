@@ -4,7 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "ps aux | grep node | grep -v grep | awk '{print $2}' | xargs kill || true && sleep 2",
     "dev": "concurrently \"npm run server\" \"wait-on http://127.0.0.1:5000/api/health && npm run client\"",
     "dev-simple": "npm run build && npm run server",
     "client": "vite --port 3000 --host 0.0.0.0",
@@ -13,7 +12,8 @@
     "preview": "vite preview --port 3000 --host 0.0.0.0",
     "start": "npm run dev-simple",
     "seed": "node server/scripts/seed.cjs",
-    "seed:fresh": "npm run seed"
+    "seed:fresh": "npm run seed",
+    "init-db": "node server/scripts/init-database.cjs"
   },
   "dependencies": {
     "react": "^18.3.1",

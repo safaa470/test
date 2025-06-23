@@ -36,8 +36,8 @@ class DatabaseSeeder {
     console.log('🌱 Starting comprehensive database seeding...');
     
     try {
-      // Skip verification - assume tables exist after migration
-      console.log('⏭️ Skipping verification - tables should exist after migration');
+      // Skip verification - assume tables exist after initialization
+      console.log('⏭️ Skipping verification - tables should exist after initialization');
       
       // Clear existing data (in reverse order due to foreign keys)
       await this.clearExistingData();

@@ -1,25 +1,41 @@
 #!/usr/bin/env node
 
 /**
- * Database Seeding Script - FIXED VERSION
+ * Database Seeding Script - COMPREHENSIVE VERSION
  * 
- * This script ensures database tables exist before seeding data
+ * This script initializes the database and seeds it with sample data
  * Run with: npm run seed
  */
 
 async function main() {
-  console.log('🌱 Warehouse Management System - Database Seeder (FIXED)');
-  console.log('=======================================================\n');
+  console.log('🌱 Warehouse Management System - Database Seeder (COMPREHENSIVE)');
+  console.log('================================================================\n');
   
   try {
-    // STEP 1: Force run migrations to ensure all tables exist
-    console.log('🔧 STEP 1: Running database migrations...');
-    const { default: DatabaseMigrator } = await import('../database/migrator.js');
-    const migrator = new DatabaseMigrator();
-    await migrator.runMigrations();
-    await migrator.verifyTables();
-    await migrator.close();
-    console.log('✅ Database migrations completed\n');
+    // STEP 1: Initialize database (create tables)
+    console.log('🔧 STEP 1: Initializing database...');
+    const { spawn } = require('child_process');
+    
+    await new Promise((resolve, reject) => {
+      const initProcess = spawn('node', ['server/scripts/init-database.cjs'], {
+        stdio: 'inherit',
+        cwd: process.cwd()
+      });
+      
+      initProcess.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`Database initialization failed with code ${code}`));
+        }
+      });
+      
+      initProcess.on('error', (error) => {
+        reject(error);
+      });
+    });
+    
+    console.log('✅ Database initialization completed\n');
     
     // STEP 2: Run the seeder
     console.log('🌱 STEP 2: Starting database seeding...');
