@@ -1,7 +1,10 @@
 import express from 'express';
-import Database from 'better-sqlite3';
+import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+const require = createRequire(import.meta.url);
+const Database = require('better-sqlite3');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
