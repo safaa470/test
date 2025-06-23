@@ -55,7 +55,16 @@ const getData = (sql, params = []) => {
         console.error('❌ SQL Error in inventory route:', err);
         reject(err);
       } else {
-        console.log(`📊 Query returned ${rows.length} rows`);
+        console.log(`📊 Inventory Query returned ${rows.length} rows`);
+        // Log first few items for debugging
+        if (rows.length > 0) {
+          console.log('📋 Sample inventory items:', rows.slice(0, 3).map(item => ({
+            id: item.id,
+            name: item.name,
+            sku: item.sku,
+            quantity: item.quantity
+          })));
+        }
         resolve(rows);
       }
     });
@@ -113,13 +122,20 @@ router.get('/', async (req, res) => {
     const items = await getData(query);
     console.log(`✅ Found ${items.length} inventory items`);
     
-    if (items.length > 0) {
-      console.log('📋 Sample items:', items.slice(0, 3).map(item => ({
-        id: item.id,
-        name: item.name,
-        sku: item.sku,
-        quantity: item.quantity
-      })));
+    // Enhanced logging for debugging
+    if (items.length === 0) {
+      console.log('⚠️ No inventory items found! Checking if tables exist...');
+      try {
+        const tableCheck = await getData("SELECT name FROM sqlite_master WHERE type='table' AND name='inventory'");
+        console.log('📋 Inventory table exists:', tableCheck.length > 0);
+        
+        if (tableCheck.length > 0) {
+          const count = await getData("SELECT COUNT(*) as count FROM inventory");
+          console.log('📊 Total inventory records in DB:', count[0].count);
+        }
+      } catch (checkError) {
+        console.error('❌ Error checking inventory table:', checkError);
+      }
     }
     
     res.json(items);
@@ -187,15 +203,15 @@ router.post('/', async (req, res) => {
       INSERT INTO inventory (
         name, sku, description, category_id, base_unit_id, issue_unit_id,
         location_id, supplier_id, quantity, min_quantity, max_quantity, 
-        unit_price, total_value, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        unit_price, total_value, last_purchase_price, average_price, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `;
 
     const result = await runQuery(query, [
       name, sku, description, category_id || null, base_unit_id || null, 
       issue_unit_id || null, location_id || null, supplier_id || null,
       quantity || 0, min_quantity || 0, max_quantity || 0, 
-      unit_price || 0, total_value
+      unit_price || 0, total_value, unit_price || 0, unit_price || 0
     ]);
 
     console.log(`✅ Created item with ID: ${result.lastID}`);

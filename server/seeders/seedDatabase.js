@@ -36,8 +36,8 @@ class DatabaseSeeder {
     console.log('🌱 Starting comprehensive database seeding...');
     
     try {
-      // First, verify database structure
-      await this.verifyDatabase();
+      // Skip verification - assume tables exist after migration
+      console.log('⏭️ Skipping verification - tables should exist after migration');
       
       // Clear existing data (in reverse order due to foreign keys)
       await this.clearExistingData();
@@ -61,27 +61,6 @@ class DatabaseSeeder {
       throw error;
     } finally {
       await this.close();
-    }
-  }
-
-  async verifyDatabase() {
-    console.log('🔍 Verifying database structure...');
-    
-    try {
-      const tables = await this.getData("SELECT name FROM sqlite_master WHERE type='table'");
-      console.log('📋 Available tables:', tables.map(t => t.name));
-      
-      const requiredTables = ['categories', 'units', 'locations', 'suppliers', 'inventory'];
-      for (const tableName of requiredTables) {
-        const tableExists = tables.some(t => t.name === tableName);
-        if (!tableExists) {
-          throw new Error(`❌ Required table '${tableName}' does not exist`);
-        }
-        console.log(`✅ Table '${tableName}' exists`);
-      }
-    } catch (error) {
-      console.error('❌ Database verification failed:', error);
-      throw error;
     }
   }
 
@@ -150,7 +129,7 @@ class DatabaseSeeder {
           category.parent_id || null,
           category.description
         ]);
-        console.log(`  ✓ Added category: ${category.name} (ID: ${result.lastID})`);
+        console.log(`  ✓ Added category: ${category.name} (ID: ${category.id})`);
       } catch (error) {
         console.error(`  ✗ Failed to add category ${category.name}:`, error.message);
         throw error;
@@ -176,7 +155,7 @@ class DatabaseSeeder {
           unit.base_unit_id || null,
           unit.conversion_factor || 1
         ]);
-        console.log(`  ✓ Added unit: ${unit.name} (${unit.abbreviation}) (ID: ${result.lastID})`);
+        console.log(`  ✓ Added unit: ${unit.name} (${unit.abbreviation}) (ID: ${unit.id})`);
       } catch (error) {
         console.error(`  ✗ Failed to add unit ${unit.name}:`, error.message);
         throw error;
@@ -200,7 +179,7 @@ class DatabaseSeeder {
           location.description,
           location.address
         ]);
-        console.log(`  ✓ Added location: ${location.name} (ID: ${result.lastID})`);
+        console.log(`  ✓ Added location: ${location.name} (ID: ${location.id})`);
       } catch (error) {
         console.error(`  ✗ Failed to add location ${location.name}:`, error.message);
         throw error;
@@ -226,7 +205,7 @@ class DatabaseSeeder {
           supplier.phone,
           supplier.address
         ]);
-        console.log(`  ✓ Added supplier: ${supplier.name} (ID: ${result.lastID})`);
+        console.log(`  ✓ Added supplier: ${supplier.name} (ID: ${supplier.id})`);
       } catch (error) {
         console.error(`  ✗ Failed to add supplier ${supplier.name}:`, error.message);
         throw error;
@@ -244,12 +223,16 @@ class DatabaseSeeder {
     
     for (const item of sampleInventoryItems) {
       try {
+        // Calculate total value
+        const totalValue = (item.quantity || 0) * (item.unit_price || 0);
+        
         const result = await this.runQuery(`
           INSERT INTO inventory (
             id, name, sku, description, category_id, base_unit_id, issue_unit_id,
             location_id, supplier_id, quantity, min_quantity, max_quantity, unit_price,
+            total_value, last_purchase_price, average_price,
             created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
         `, [
           item.id,
           item.name,
@@ -263,14 +246,16 @@ class DatabaseSeeder {
           item.quantity,
           item.min_quantity,
           item.max_quantity,
-          item.unit_price
+          item.unit_price,
+          totalValue,
+          item.unit_price, // last_purchase_price
+          item.unit_price  // average_price
         ]);
-        console.log(`  ✓ Added inventory item: ${item.name} (${item.sku}) (ID: ${result.lastID})`);
+        console.log(`  ✓ Added inventory item: ${item.name} (${item.sku}) - Qty: ${item.quantity} (ID: ${item.id})`);
         successCount++;
       } catch (error) {
         console.error(`  ✗ Failed to add inventory item ${item.name}:`, error.message);
         errorCount++;
-        // Don't throw here, continue with other items
       }
     }
 
@@ -341,6 +326,7 @@ class DatabaseSeeder {
       });
       
       console.log('\n✅ Database seeding completed successfully!');
+      console.log('🔄 IMPORTANT: Refresh your browser to see the inventory data!');
     } catch (error) {
       console.error('❌ Error displaying summary:', error);
     }

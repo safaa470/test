@@ -1,35 +1,39 @@
 #!/usr/bin/env node
 
 /**
- * Database Seeding Script
+ * Database Seeding Script - FIXED VERSION
  * 
- * This script populates the database with sample inventory data for testing.
+ * This script ensures database tables exist before seeding data
  * Run with: npm run seed
  */
 
 async function main() {
-  console.log('🌱 Warehouse Management System - Database Seeder');
-  console.log('================================================\n');
+  console.log('🌱 Warehouse Management System - Database Seeder (FIXED)');
+  console.log('=======================================================\n');
   
   try {
-    // First, run migrations to ensure database schema exists
-    console.log('🔧 Running database migrations...');
+    // STEP 1: Force run migrations to ensure all tables exist
+    console.log('🔧 STEP 1: Running database migrations...');
     const { default: DatabaseMigrator } = await import('../database/migrator.js');
     const migrator = new DatabaseMigrator();
     await migrator.runMigrations();
+    await migrator.verifyTables();
+    await migrator.close();
     console.log('✅ Database migrations completed\n');
     
-    // Then run the seeder
-    console.log('🌱 Starting database seeding...');
+    // STEP 2: Run the seeder
+    console.log('🌱 STEP 2: Starting database seeding...');
     const { default: DatabaseSeeder } = await import('../seeders/seedDatabase.js');
     const seeder = new DatabaseSeeder();
     await seeder.seedAll();
     
     console.log('\n🎉 Database seeding completed successfully!');
-    console.log('You can now test the application with sample data.');
+    console.log('✅ All inventory items have been seeded.');
+    console.log('🔄 Please refresh your browser to see the inventory data.');
     
   } catch (error) {
     console.error('\n❌ Seeding failed:', error.message);
+    console.error('Full error:', error);
     process.exit(1);
   }
 }
