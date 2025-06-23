@@ -12,6 +12,15 @@ async function main() {
   console.log('================================================\n');
   
   try {
+    // First, run migrations to ensure database schema exists
+    console.log('🔧 Running database migrations...');
+    const { default: DatabaseMigrator } = await import('../database/migrator.js');
+    const migrator = new DatabaseMigrator();
+    await migrator.runMigrations();
+    console.log('✅ Database migrations completed\n');
+    
+    // Then run the seeder
+    console.log('🌱 Starting database seeding...');
     const { default: DatabaseSeeder } = await import('../seeders/seedDatabase.js');
     const seeder = new DatabaseSeeder();
     await seeder.seedAll();
