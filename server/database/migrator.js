@@ -107,6 +107,19 @@ class DatabaseMigrator {
       )
     `);
 
+    // Departments table
+    await this.runQuery(`
+      CREATE TABLE IF NOT EXISTS departments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
+        manager_name TEXT,
+        budget DECIMAL(12,2) DEFAULT 0,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Categories table
     await this.runQuery(`
       CREATE TABLE IF NOT EXISTS categories (
@@ -238,7 +251,9 @@ class DatabaseMigrator {
       'CREATE INDEX IF NOT EXISTS idx_inventory_supplier ON inventory(supplier_id)',
       'CREATE INDEX IF NOT EXISTS idx_purchase_history_inventory_id ON purchase_history(inventory_id)',
       'CREATE INDEX IF NOT EXISTS idx_user_activity_user_id ON user_activity(user_id)',
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_barcode ON inventory(barcode) WHERE barcode IS NOT NULL'
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_barcode ON inventory(barcode) WHERE barcode IS NOT NULL',
+      'CREATE INDEX IF NOT EXISTS idx_departments_name ON departments(name)',
+      'CREATE INDEX IF NOT EXISTS idx_departments_active ON departments(is_active)'
     ];
 
     for (const indexSql of indexes) {
@@ -260,7 +275,7 @@ class DatabaseMigrator {
       console.log('📋 Available tables:', tables.map(t => t.name));
       
       // Check each required table
-      const requiredTables = ['categories', 'units', 'locations', 'suppliers', 'inventory'];
+      const requiredTables = ['categories', 'units', 'locations', 'suppliers', 'inventory', 'departments'];
       for (const tableName of requiredTables) {
         const tableExists = tables.some(t => t.name === tableName);
         if (tableExists) {

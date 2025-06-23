@@ -23,7 +23,7 @@ async function initializeDatabase() {
     console.log('✅ Database initialized successfully');
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
-    throw error; // Throw instead of process.exit
+    throw error;
   }
 }
 
@@ -35,16 +35,18 @@ async function setupRoutes() {
     const { default: unitsRouter } = await import('./routes/units.js');
     const { default: locationsRouter } = await import('./routes/locations.js');
     const { default: suppliersRouter } = await import('./routes/suppliers.js');
+    const { default: departmentsRouter } = await import('./routes/departments.js');
 
     app.use('/api/inventory', inventoryRouter);
     app.use('/api/categories', categoriesRouter);
     app.use('/api/units', unitsRouter);
     app.use('/api/locations', locationsRouter);
     app.use('/api/suppliers', suppliersRouter);
+    app.use('/api/departments', departmentsRouter);
     console.log('✅ Routes setup successfully');
   } catch (error) {
     console.error('❌ Error setting up routes:', error);
-    throw error; // Throw instead of process.exit
+    throw error;
   }
 }
 
