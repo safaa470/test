@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
+const sqlite3 = require('sqlite3').verbose();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,10 +13,54 @@ const router = express.Router();
 
 // Initialize database connection
 const dbPath = path.join(__dirname, '../database/warehouse.db');
-const db = new Database(dbPath);
+
+// Helper function to run queries with promises
+const runQuery = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath);
+    db.run(sql, params, function(err) {
+      db.close();
+      if (err) {
+        reject(err);
+      } else {
+        resolve({ lastID: this.lastID, changes: this.changes });
+      }
+    });
+  });
+};
+
+// Helper function to get data with promises
+const getData = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath);
+    db.all(sql, params, (err, rows) => {
+      db.close();
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
+};
+
+// Helper function to get single row
+const getRow = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath);
+    db.get(sql, params, (err, row) => {
+      db.close();
+      if (err) {
+        reject(err);
+      } else {
+        resolve(row);
+      }
+    });
+  });
+};
 
 // Get all inventory items with related data
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const query = `
       SELECT 
@@ -37,7 +81,7 @@ router.get('/', (req, res) => {
       ORDER BY i.name
     `;
     
-    const items = db.prepare(query).all();
+    const items = await getData(query);
     res.json(items);
   } catch (error) {
     console.error('Error fetching inventory:', error);
@@ -46,7 +90,7 @@ router.get('/', (req, res) => {
 });
 
 // Get single inventory item
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const query = `
       SELECT 
@@ -67,7 +111,7 @@ router.get('/:id', (req, res) => {
       WHERE i.id = ?
     `;
     
-    const item = db.prepare(query).get(req.params.id);
+    const item = await getRow(query, [req.params.id]);
     
     if (!item) {
       return res.status(404).json({ error: 'Item not found' });
@@ -81,7 +125,7 @@ router.get('/:id', (req, res) => {
 });
 
 // Create new inventory item
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const {
       name, sku, description, category_id, base_unit_id, issue_unit_id,
@@ -99,15 +143,15 @@ router.post('/', (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `;
 
-    const result = db.prepare(query).run(
+    const result = await runQuery(query, [
       name, sku, description, category_id || null, base_unit_id || null, 
       issue_unit_id || null, location_id || null, supplier_id || null,
       quantity || 0, min_quantity || 0, max_quantity || 0, 
       unit_price || 0, total_value
-    );
+    ]);
 
     res.status(201).json({ 
-      id: result.lastInsertRowid, 
+      id: result.lastID, 
       message: 'Item created successfully' 
     });
   } catch (error) {
@@ -121,7 +165,7 @@ router.post('/', (req, res) => {
 });
 
 // Update inventory item
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const {
       name, sku, description, category_id, base_unit_id, issue_unit_id,
@@ -140,12 +184,12 @@ router.put('/:id', (req, res) => {
       WHERE id = ?
     `;
 
-    const result = db.prepare(query).run(
+    const result = await runQuery(query, [
       name, sku, description, category_id || null, base_unit_id || null,
       issue_unit_id || null, location_id || null, supplier_id || null,
       quantity || 0, min_quantity || 0, max_quantity || 0,
       unit_price || 0, total_value, req.params.id
-    );
+    ]);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Item not found' });
@@ -163,9 +207,9 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete inventory item
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const result = db.prepare('DELETE FROM inventory WHERE id = ?').run(req.params.id);
+    const result = await runQuery('DELETE FROM inventory WHERE id = ?', [req.params.id]);
     
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Item not found' });

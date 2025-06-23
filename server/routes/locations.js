@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
+const sqlite3 = require('sqlite3').verbose();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,12 +12,41 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 const dbPath = path.join(__dirname, '../database/warehouse.db');
-const db = new Database(dbPath);
+
+// Helper function to run queries with promises
+const runQuery = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath);
+    db.run(sql, params, function(err) {
+      db.close();
+      if (err) {
+        reject(err);
+      } else {
+        resolve({ lastID: this.lastID, changes: this.changes });
+      }
+    });
+  });
+};
+
+// Helper function to get data with promises
+const getData = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(dbPath);
+    db.all(sql, params, (err, rows) => {
+      db.close();
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
+};
 
 // Get all locations
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const locations = db.prepare('SELECT * FROM locations ORDER BY name').all();
+    const locations = await getData('SELECT * FROM locations ORDER BY name');
     res.json(locations);
   } catch (error) {
     console.error('Error fetching locations:', error);
@@ -26,17 +55,17 @@ router.get('/', (req, res) => {
 });
 
 // Create new location
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name, description, address } = req.body;
     
-    const result = db.prepare(`
+    const result = await runQuery(`
       INSERT INTO locations (name, description, address)
       VALUES (?, ?, ?)
-    `).run(name, description || null, address || null);
+    `, [name, description || null, address || null]);
 
     res.status(201).json({ 
-      id: result.lastInsertRowid, 
+      id: result.lastID, 
       message: 'Location created successfully' 
     });
   } catch (error) {
@@ -46,15 +75,15 @@ router.post('/', (req, res) => {
 });
 
 // Update location
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { name, description, address } = req.body;
     
-    const result = db.prepare(`
+    const result = await runQuery(`
       UPDATE locations 
       SET name = ?, description = ?, address = ?
       WHERE id = ?
-    `).run(name, description || null, address || null, req.params.id);
+    `, [name, description || null, address || null, req.params.id]);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Location not found' });
@@ -68,9 +97,9 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete location
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const result = db.prepare('DELETE FROM locations WHERE id = ?').run(req.params.id);
+    const result = await runQuery('DELETE FROM locations WHERE id = ?', [req.params.id]);
     
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Location not found' });
