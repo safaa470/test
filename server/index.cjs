@@ -23,20 +23,9 @@ async function initializeDatabase() {
     console.log('✅ Database initialized successfully');
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
-    process.exit(1);
+    throw error; // Throw instead of process.exit
   }
 }
-
-// Initialize database on startup
-initializeDatabase();
-
-// Serve static files from the dist directory
-app.use(express.static(path.join(__dirname, '../dist')));
-
-// Basic health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
-});
 
 // API Routes - using dynamic imports for ES modules
 async function setupRoutes() {
@@ -52,14 +41,17 @@ async function setupRoutes() {
     app.use('/api/units', unitsRouter);
     app.use('/api/locations', locationsRouter);
     app.use('/api/suppliers', suppliersRouter);
+    console.log('✅ Routes setup successfully');
   } catch (error) {
     console.error('❌ Error setting up routes:', error);
-    process.exit(1);
+    throw error; // Throw instead of process.exit
   }
 }
 
-// Setup routes
-setupRoutes();
+// Basic health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
+});
 
 // Dashboard stats endpoint
 app.get('/api/dashboard/stats', (req, res) => {
@@ -151,6 +143,9 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
+// Serve static files from the dist directory
+app.use(express.static(path.join(__dirname, '../dist')));
+
 // Catch-all handler: send back React's index.html file for client-side routing
 app.get('*', (req, res) => {
   const indexPath = path.join(__dirname, '../dist/index.html');
@@ -167,10 +162,30 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Main startup function
+async function startServer() {
+  try {
+    console.log('🚀 Starting server initialization...');
+    
+    // Wait for database initialization
+    await initializeDatabase();
+    
+    // Wait for routes setup
+    await setupRoutes();
+    
+    // Start server only after all initialization is complete
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server running on http://localhost:${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+    
+  } catch (error) {
+    console.error('❌ Server startup failed:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
 
 module.exports = app;
