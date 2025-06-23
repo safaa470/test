@@ -11,7 +11,7 @@
     "build": "vite build",
     "preview": "vite preview --port 3000 --host 0.0.0.0",
     "start": "npm run dev-simple",
-    "seed": "node server/scripts/seed.js",
+    "seed": "node server/scripts/seed.cjs",
     "seed:fresh": "npm run seed"
   },
   "dependencies": {
