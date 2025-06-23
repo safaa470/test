@@ -353,7 +353,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     return `${invItem.name} (${invItem.sku}) - ${stockText}`;
   };
 
-  // Ensure all arrays are properly initialized
+  // Ensure all arrays are properly initialized with additional safety checks
   const inventoryArray = Array.isArray(inventory) ? inventory : [];
   const unitsArray = Array.isArray(units) ? units : [];
   const departmentsArray = Array.isArray(departments) ? departments : [];
@@ -413,7 +413,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                     onChange={handleChange}
                   >
                     <option value="">Select Department</option>
-                    {departmentsArray.map(dept => (
+                    {Array.isArray(departmentsArray) && departmentsArray.map(dept => (
                       <option key={dept.id} value={dept.name}>
                         {dept.name}
                       </option>
@@ -466,7 +466,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                     value={formData.workflow_id}
                     onChange={handleChange}
                   >
-                    {workflowsArray.map(workflow => (
+                    {Array.isArray(workflowsArray) && workflowsArray.map(workflow => (
                       <option key={workflow.id} value={workflow.id}>
                         {workflow.name}
                       </option>
@@ -519,7 +519,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
               </div>
 
               <div className="space-y-4">
-                {itemsArray.map((item, index) => {
+                {Array.isArray(itemsArray) && itemsArray.map((item, index) => {
                   const stockStatus = getStockStatus(item);
                   
                   return (
@@ -548,7 +548,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                             onChange={(e) => handleItemChange(index, 'inventory_id', e.target.value)}
                           >
                             <option value="">Select from inventory (optional)</option>
-                            {inventoryArray.map(invItem => (
+                            {Array.isArray(inventoryArray) && inventoryArray.map(invItem => (
                               <option key={invItem.id} value={invItem.id}>
                                 {formatInventoryOption(invItem)}
                               </option>
@@ -557,7 +557,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                           {item.inventory_id && (
                             <div className="mt-2">
                               {(() => {
-                                const selectedItem = inventoryArray.find(inv => inv.id == item.inventory_id);
+                                const selectedItem = Array.isArray(inventoryArray) ? inventoryArray.find(inv => inv.id == item.inventory_id) : null;
                                 if (selectedItem) {
                                   const stock = selectedItem.quantity || 0;
                                   return (
@@ -622,7 +622,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                             onChange={(e) => handleItemChange(index, 'unit_id', e.target.value)}
                           >
                             <option value="">Select unit</option>
-                            {unitsArray.map(unit => (
+                            {Array.isArray(unitsArray) && unitsArray.map(unit => (
                               <option key={unit.id} value={unit.id}>
                                 {unit.name} ({unit.abbreviation})
                               </option>
@@ -718,7 +718,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
               </div>
 
               {/* Purchase Order Notice */}
-              {itemsArray.some(item => item.needs_purchase) && (
+              {Array.isArray(itemsArray) && itemsArray.some(item => item.needs_purchase) && (
                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <div className="flex items-start">
                     <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
