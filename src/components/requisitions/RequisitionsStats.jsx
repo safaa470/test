@@ -1,0 +1,58 @@
+import React from 'react';
+import { FileText, Clock, User, CheckCircle } from 'lucide-react';
+
+const RequisitionsStats = ({ stats }) => {
+  const statCards = [
+    {
+      title: 'Total Requisitions',
+      value: stats.totalRequisitions || 0,
+      icon: FileText,
+      color: 'text-primary-500',
+      bgColor: 'bg-primary-50'
+    },
+    {
+      title: 'Pending Approvals',
+      value: stats.pendingApprovals || 0,
+      icon: Clock,
+      color: 'text-yellow-500',
+      bgColor: 'bg-yellow-50'
+    },
+    {
+      title: 'My Requisitions',
+      value: stats.myRequisitions || 0,
+      icon: User,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-50'
+    },
+    {
+      title: 'Approved This Month',
+      value: stats.approvedThisMonth || 0,
+      icon: CheckCircle,
+      color: 'text-green-500',
+      bgColor: 'bg-green-50'
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {statCards.map((card, index) => {
+        const Icon = card.icon;
+        return (
+          <div key={index} className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div className="flex items-center">
+              <div className={`p-3 rounded-lg ${card.bgColor}`}>
+                <Icon className={`h-6 w-6 ${card.color}`} />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">{card.title}</p>
+                <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export default RequisitionsStats;
