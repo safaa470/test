@@ -32,6 +32,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
   const [departments, setDepartments] = useState([]);
 
   useEffect(() => {
+    console.log('🔄 RequisitionModal mounted, fetching data...');
     fetchDropdownData();
     
     if (requisition) {
@@ -52,6 +53,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
 
   const fetchDropdownData = async () => {
     try {
+      console.log('📡 Fetching dropdown data...');
       const [inventoryRes, unitsRes, workflowsRes, departmentsRes] = await Promise.all([
         axios.get('/api/inventory'),
         axios.get('/api/units'),
@@ -59,7 +61,14 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         axios.get('/api/departments').catch(() => ({ data: [] })) // Graceful fallback
       ]);
 
-      console.log('Inventory data loaded:', inventoryRes.data); // Debug log
+      console.log('📦 Inventory data received:', inventoryRes.data.length, 'items');
+      console.log('🏢 Departments data received:', departmentsRes.data.length, 'departments');
+      
+      // Log first few inventory items to check structure
+      if (inventoryRes.data.length > 0) {
+        console.log('📋 Sample inventory item:', inventoryRes.data[0]);
+      }
+
       setInventory(inventoryRes.data);
       setUnits(unitsRes.data);
       setDepartments(departmentsRes.data);
@@ -76,7 +85,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         ]);
       }
     } catch (error) {
-      console.error('Error fetching dropdown data:', error);
+      console.error('❌ Error fetching dropdown data:', error);
       // Set fallback data
       setWorkflows([
         { id: 1, name: 'Standard Approval' },
@@ -201,7 +210,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     if (field === 'inventory_id' && value) {
       const inventoryItem = inventory.find(item => item.id == value);
       if (inventoryItem) {
-        console.log('Selected inventory item:', inventoryItem); // Debug log
+        console.log('🎯 Selected inventory item:', inventoryItem);
         newItems[index].item_name = inventoryItem.name;
         newItems[index].item_description = inventoryItem.description || '';
         newItems[index].unit_id = inventoryItem.base_unit_id;
@@ -212,6 +221,12 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
         // Check if purchase is needed
         const requestedQty = newItems[index].quantity_requested || 0;
         newItems[index].needs_purchase = requestedQty > inventoryItem.quantity;
+        
+        console.log('📊 Stock info updated:', {
+          stock: inventoryItem.quantity,
+          requested: requestedQty,
+          needsPurchase: newItems[index].needs_purchase
+        });
       }
     }
     
@@ -284,6 +299,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     return 'bg-green-100 text-green-800';
   };
 
+  // CRITICAL: This function formats the inventory dropdown options with stock info
   const formatInventoryOption = (invItem) => {
     const stock = invItem.quantity || 0;
     let stockText = `Stock: ${stock}`;
@@ -296,6 +312,9 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
     
     return `${invItem.name} (${invItem.sku}) - ${stockText}`;
   };
+
+  console.log('🔍 Current inventory count:', inventory.length);
+  console.log('🔍 Current departments count:', departments.length);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -354,7 +373,7 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Select the requesting department
+                    Select the requesting department ({departments.length} available)
                   </p>
                 </div>
 
@@ -665,6 +684,11 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Debug Info */}
+            <div className="bg-gray-100 rounded-lg p-4 text-xs text-gray-600">
+              <strong>Debug Info:</strong> Inventory: {inventory.length} items | Departments: {departments.length} | Units: {units.length}
             </div>
           </form>
         </div>
