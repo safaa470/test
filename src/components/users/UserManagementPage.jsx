@@ -34,9 +34,10 @@ const UserManagementPage = () => {
   const fetchUsers = async () => {
     try {
       const response = await axios.get('/api/users');
-      setUsers(response.data);
+      setUsers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       toast.error('Error fetching users');
+      setUsers([]);
     } finally {
       setLoading(false);
     }

@@ -33,9 +33,10 @@ const UnitModal = ({ item, onClose, onSuccess }) => {
   const fetchUnits = async () => {
     try {
       const response = await axios.get('/api/units');
-      setUnits(response.data);
+      setUnits(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching units:', error);
+      setUnits([]);
     }
   };
 

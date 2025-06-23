@@ -59,7 +59,7 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
   const fetchCompatibleUnits = async (unitId) => {
     try {
       const response = await axios.get(`/api/units/compatible/${unitId}`);
-      setCompatibleUnits(response.data);
+      setCompatibleUnits(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching compatible units:', error);
       setCompatibleUnits([]);
@@ -193,8 +193,9 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
 
   // Organize categories hierarchically
   const organizeCategories = () => {
-    const mainCategories = categories.filter(cat => !cat.parent_id);
-    const subCategories = categories.filter(cat => cat.parent_id);
+    const safeCategories = Array.isArray(categories) ? categories : [];
+    const mainCategories = safeCategories.filter(cat => !cat.parent_id);
+    const subCategories = safeCategories.filter(cat => cat.parent_id);
     
     return mainCategories.map(mainCat => ({
       ...mainCat,
@@ -207,6 +208,11 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
   const getFieldError = (fieldName) => {
     return validationErrors[fieldName] ? 'border-red-300' : '';
   };
+
+  // Ensure all props are arrays
+  const safeUnits = Array.isArray(units) ? units : [];
+  const safeLocations = Array.isArray(locations) ? locations : [];
+  const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -322,7 +328,7 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                   onChange={handleChange}
                 >
                   <option value="">Select Base Unit</option>
-                  {units.map(unit => (
+                  {safeUnits.map(unit => (
                     <option key={unit.id} value={unit.id}>
                       {unit.name} ({unit.abbreviation}) - {unit.unit_type}
                     </option>
@@ -368,7 +374,7 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                   onChange={handleChange}
                 >
                   <option value="">Select Location</option>
-                  {locations.map(location => (
+                  {safeLocations.map(location => (
                     <option key={location.id} value={location.id}>
                       {location.name}
                     </option>
@@ -388,7 +394,7 @@ const InventoryModal = ({ item, categories, units, locations, suppliers, onClose
                 onChange={handleChange}
               >
                 <option value="">Select Supplier</option>
-                {suppliers.map(supplier => (
+                {safeSuppliers.map(supplier => (
                   <option key={supplier.id} value={supplier.id}>
                     {supplier.name}
                   </option>

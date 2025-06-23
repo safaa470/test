@@ -117,9 +117,36 @@ const RequisitionModal = ({ requisition, onClose, onSuccess }) => {
           available_stock: 0,
           needs_purchase: false
         })));
+      } else {
+        // Ensure items is always an array
+        setItems([{
+          inventory_id: '',
+          item_name: '',
+          item_description: '',
+          quantity_requested: 1,
+          unit_id: '',
+          estimated_unit_cost: 0,
+          notes: '',
+          current_stock: 0,
+          available_stock: 0,
+          needs_purchase: false
+        }]);
       }
     } catch (error) {
       console.error('Error fetching requisition items:', error);
+      // Ensure items is always an array even on error
+      setItems([{
+        inventory_id: '',
+        item_name: '',
+        item_description: '',
+        quantity_requested: 1,
+        unit_id: '',
+        estimated_unit_cost: 0,
+        notes: '',
+        current_stock: 0,
+        available_stock: 0,
+        needs_purchase: false
+      }]);
     }
   };
 

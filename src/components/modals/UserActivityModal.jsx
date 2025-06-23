@@ -22,9 +22,10 @@ const UserActivityModal = ({ userId, onClose }) => {
       const response = await axios.get(`/api/users/${userId}/activity`, {
         params: { filter, days: dateRange }
       });
-      setActivities(response.data);
+      setActivities(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       toast.error('Error fetching user activity');
+      setActivities([]);
     } finally {
       setLoading(false);
     }
