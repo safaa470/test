@@ -1,12 +1,16 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const { 
+import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { 
   sampleCategories, 
   sampleUnits, 
   sampleLocations, 
   sampleSuppliers, 
   sampleInventoryItems 
-} = require('./sampleData');
+} from './sampleData.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class DatabaseSeeder {
   constructor() {
@@ -261,10 +265,10 @@ class DatabaseSeeder {
 }
 
 // Export for use in other files
-module.exports = DatabaseSeeder;
+export default DatabaseSeeder;
 
 // Run seeder if called directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const seeder = new DatabaseSeeder();
   seeder.seedAll().catch(console.error);
 }

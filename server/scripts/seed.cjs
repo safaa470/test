@@ -7,13 +7,12 @@
  * Run with: npm run seed
  */
 
-const DatabaseSeeder = require('../seeders/seedDatabase');
-
 async function main() {
   console.log('🌱 Warehouse Management System - Database Seeder');
   console.log('================================================\n');
   
   try {
+    const { default: DatabaseSeeder } = await import('../seeders/seedDatabase.js');
     const seeder = new DatabaseSeeder();
     await seeder.seedAll();
     

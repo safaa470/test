@@ -37,12 +37,28 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// API Routes
-app.use('/api/inventory', require('./routes/inventory'));
-app.use('/api/categories', require('./routes/categories'));
-app.use('/api/units', require('./routes/units'));
-app.use('/api/locations', require('./routes/locations'));
-app.use('/api/suppliers', require('./routes/suppliers'));
+// API Routes - using dynamic imports for ES modules
+async function setupRoutes() {
+  try {
+    const { default: inventoryRouter } = await import('./routes/inventory.js');
+    const { default: categoriesRouter } = await import('./routes/categories.js');
+    const { default: unitsRouter } = await import('./routes/units.js');
+    const { default: locationsRouter } = await import('./routes/locations.js');
+    const { default: suppliersRouter } = await import('./routes/suppliers.js');
+
+    app.use('/api/inventory', inventoryRouter);
+    app.use('/api/categories', categoriesRouter);
+    app.use('/api/units', unitsRouter);
+    app.use('/api/locations', locationsRouter);
+    app.use('/api/suppliers', suppliersRouter);
+  } catch (error) {
+    console.error('❌ Error setting up routes:', error);
+    process.exit(1);
+  }
+}
+
+// Setup routes
+setupRoutes();
 
 // Dashboard stats endpoint
 app.get('/api/dashboard/stats', (req, res) => {
