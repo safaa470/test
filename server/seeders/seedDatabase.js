@@ -19,14 +19,26 @@ class DatabaseSeeder {
   constructor() {
     const dbPath = path.join(__dirname, '../database/warehouse.db');
     console.log('📍 Database path:', dbPath);
-    this.db = new sqlite3.Database(dbPath);
+    
+    this.db = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+        console.error('❌ Database connection error:', err);
+        throw err;
+      } else {
+        console.log('✅ Database connected for seeding');
+      }
+    });
+    
     this.db.run('PRAGMA foreign_keys = ON');
   }
 
   async seedAll() {
-    console.log('🌱 Starting database seeding...');
+    console.log('🌱 Starting comprehensive database seeding...');
     
     try {
+      // First, verify database structure
+      await this.verifyDatabase();
+      
       // Clear existing data (in reverse order due to foreign keys)
       await this.clearExistingData();
       
@@ -48,7 +60,28 @@ class DatabaseSeeder {
       console.error('❌ Error seeding database:', error);
       throw error;
     } finally {
-      this.db.close();
+      await this.close();
+    }
+  }
+
+  async verifyDatabase() {
+    console.log('🔍 Verifying database structure...');
+    
+    try {
+      const tables = await this.getData("SELECT name FROM sqlite_master WHERE type='table'");
+      console.log('📋 Available tables:', tables.map(t => t.name));
+      
+      const requiredTables = ['categories', 'units', 'locations', 'suppliers', 'inventory'];
+      for (const tableName of requiredTables) {
+        const tableExists = tables.some(t => t.name === tableName);
+        if (!tableExists) {
+          throw new Error(`❌ Required table '${tableName}' does not exist`);
+        }
+        console.log(`✅ Table '${tableName}' exists`);
+      }
+    } catch (error) {
+      console.error('❌ Database verification failed:', error);
+      throw error;
     }
   }
 
@@ -56,9 +89,9 @@ class DatabaseSeeder {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) {
-          console.error('SQL Error:', err.message);
-          console.error('SQL:', sql);
-          console.error('Params:', params);
+          console.error('❌ SQL Error:', err.message);
+          console.error('📝 SQL:', sql);
+          console.error('📝 Params:', params);
           reject(err);
         } else {
           resolve({ lastID: this.lastID, changes: this.changes });
@@ -71,7 +104,7 @@ class DatabaseSeeder {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) {
-          console.error('SQL Error:', err.message);
+          console.error('❌ SQL Error:', err.message);
           reject(err);
         } else {
           resolve(rows);
@@ -108,7 +141,7 @@ class DatabaseSeeder {
     
     for (const category of sampleCategories) {
       try {
-        await this.runQuery(`
+        const result = await this.runQuery(`
           INSERT INTO categories (id, name, parent_id, description, created_at)
           VALUES (?, ?, ?, ?, datetime('now'))
         `, [
@@ -117,9 +150,10 @@ class DatabaseSeeder {
           category.parent_id || null,
           category.description
         ]);
-        console.log(`  ✓ Added category: ${category.name}`);
+        console.log(`  ✓ Added category: ${category.name} (ID: ${result.lastID})`);
       } catch (error) {
         console.error(`  ✗ Failed to add category ${category.name}:`, error.message);
+        throw error;
       }
     }
 
@@ -131,7 +165,7 @@ class DatabaseSeeder {
     
     for (const unit of sampleUnits) {
       try {
-        await this.runQuery(`
+        const result = await this.runQuery(`
           INSERT INTO units (id, name, abbreviation, unit_type, base_unit_id, conversion_factor, created_at)
           VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
         `, [
@@ -142,9 +176,10 @@ class DatabaseSeeder {
           unit.base_unit_id || null,
           unit.conversion_factor || 1
         ]);
-        console.log(`  ✓ Added unit: ${unit.name} (${unit.abbreviation})`);
+        console.log(`  ✓ Added unit: ${unit.name} (${unit.abbreviation}) (ID: ${result.lastID})`);
       } catch (error) {
         console.error(`  ✗ Failed to add unit ${unit.name}:`, error.message);
+        throw error;
       }
     }
 
@@ -156,7 +191,7 @@ class DatabaseSeeder {
     
     for (const location of sampleLocations) {
       try {
-        await this.runQuery(`
+        const result = await this.runQuery(`
           INSERT INTO locations (id, name, description, address, created_at)
           VALUES (?, ?, ?, ?, datetime('now'))
         `, [
@@ -165,9 +200,10 @@ class DatabaseSeeder {
           location.description,
           location.address
         ]);
-        console.log(`  ✓ Added location: ${location.name}`);
+        console.log(`  ✓ Added location: ${location.name} (ID: ${result.lastID})`);
       } catch (error) {
         console.error(`  ✗ Failed to add location ${location.name}:`, error.message);
+        throw error;
       }
     }
 
@@ -179,7 +215,7 @@ class DatabaseSeeder {
     
     for (const supplier of sampleSuppliers) {
       try {
-        await this.runQuery(`
+        const result = await this.runQuery(`
           INSERT INTO suppliers (id, name, contact_person, email, phone, address, created_at)
           VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
         `, [
@@ -190,9 +226,10 @@ class DatabaseSeeder {
           supplier.phone,
           supplier.address
         ]);
-        console.log(`  ✓ Added supplier: ${supplier.name}`);
+        console.log(`  ✓ Added supplier: ${supplier.name} (ID: ${result.lastID})`);
       } catch (error) {
         console.error(`  ✗ Failed to add supplier ${supplier.name}:`, error.message);
+        throw error;
       }
     }
 
@@ -202,9 +239,12 @@ class DatabaseSeeder {
   async seedInventoryItems() {
     console.log('📦 Seeding inventory items...');
     
+    let successCount = 0;
+    let errorCount = 0;
+    
     for (const item of sampleInventoryItems) {
       try {
-        await this.runQuery(`
+        const result = await this.runQuery(`
           INSERT INTO inventory (
             id, name, sku, description, category_id, base_unit_id, issue_unit_id,
             location_id, supplier_id, quantity, min_quantity, max_quantity, unit_price,
@@ -225,13 +265,20 @@ class DatabaseSeeder {
           item.max_quantity,
           item.unit_price
         ]);
-        console.log(`  ✓ Added inventory item: ${item.name} (${item.sku})`);
+        console.log(`  ✓ Added inventory item: ${item.name} (${item.sku}) (ID: ${result.lastID})`);
+        successCount++;
       } catch (error) {
         console.error(`  ✗ Failed to add inventory item ${item.name}:`, error.message);
+        errorCount++;
+        // Don't throw here, continue with other items
       }
     }
 
-    console.log(`✅ Seeded ${sampleInventoryItems.length} inventory items`);
+    console.log(`✅ Seeded ${successCount} inventory items (${errorCount} errors)`);
+    
+    if (errorCount > 0) {
+      throw new Error(`Failed to seed ${errorCount} inventory items`);
+    }
   }
 
   async updateInventoryCalculations() {
@@ -286,21 +333,30 @@ class DatabaseSeeder {
       const outOfStockResult = await this.getData('SELECT COUNT(*) as count FROM inventory WHERE quantity = 0');
       console.log(`🚫 Out of Stock Items: ${outOfStockResult[0].count}`);
       
-      console.log('\n🎯 Test Data Includes:');
-      console.log('- Office supplies (pens, paper, notebooks)');
-      console.log('- Electronics (laptops, tablets, accessories)');
-      console.log('- Furniture (chairs, desks, storage)');
-      console.log('- Safety equipment (helmets, vests, gloves)');
-      console.log('- Cleaning supplies (cleaners, towels, bags)');
-      console.log('- Tools & hardware (drills, screwdrivers, measuring tools)');
-      console.log('- Items with various stock levels (normal, low, out of stock)');
-      console.log('- Multiple units and conversions');
-      console.log('- Realistic pricing and quantities');
+      // Show sample items
+      const sampleItems = await this.getData('SELECT name, sku, quantity FROM inventory LIMIT 5');
+      console.log('\n📋 Sample Items:');
+      sampleItems.forEach(item => {
+        console.log(`  • ${item.name} (${item.sku}) - Qty: ${item.quantity}`);
+      });
       
-      console.log('\n✅ Ready for testing!');
+      console.log('\n✅ Database seeding completed successfully!');
     } catch (error) {
-      console.error('Error displaying summary:', error);
+      console.error('❌ Error displaying summary:', error);
     }
+  }
+
+  close() {
+    return new Promise((resolve) => {
+      this.db.close((err) => {
+        if (err) {
+          console.error('❌ Error closing database:', err);
+        } else {
+          console.log('✅ Database connection closed');
+        }
+        resolve();
+      });
+    });
   }
 }
 

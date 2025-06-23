@@ -13,7 +13,22 @@ const __dirname = dirname(__filename);
 class DatabaseMigrator {
   constructor() {
     const dbPath = path.join(__dirname, 'warehouse.db');
-    this.db = new sqlite3.Database(dbPath);
+    console.log('🔍 Database path:', dbPath);
+    
+    // Ensure directory exists
+    const dbDir = path.dirname(dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      console.log('📁 Created database directory:', dbDir);
+    }
+    
+    this.db = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+        console.error('❌ Database connection error:', err);
+      } else {
+        console.log('✅ Database connected successfully');
+      }
+    });
     
     // Enable foreign keys and WAL mode
     this.db.run('PRAGMA foreign_keys = ON');
@@ -48,6 +63,8 @@ class DatabaseMigrator {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) {
+          console.error('❌ SQL Error:', err.message);
+          console.error('📝 SQL:', sql);
           reject(err);
         } else {
           resolve({ lastID: this.lastID, changes: this.changes });
@@ -56,7 +73,22 @@ class DatabaseMigrator {
     });
   }
 
+  getData(sql, params = []) {
+    return new Promise((resolve, reject) => {
+      this.db.all(sql, params, (err, rows) => {
+        if (err) {
+          console.error('❌ SQL Error:', err.message);
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
   async createTables() {
+    console.log('🏗️ Creating database tables...');
+
     // Users table
     await this.runQuery(`
       CREATE TABLE IF NOT EXISTS users (
@@ -192,9 +224,13 @@ class DatabaseMigrator {
 
     // Create indexes
     await this.createIndexes();
+    
+    console.log('✅ All tables created successfully');
   }
 
   async createIndexes() {
+    console.log('🔗 Creating database indexes...');
+    
     const indexes = [
       'CREATE INDEX IF NOT EXISTS idx_inventory_sku ON inventory(sku)',
       'CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category_id)',
@@ -209,8 +245,33 @@ class DatabaseMigrator {
       try {
         await this.runQuery(indexSql);
       } catch (error) {
-        console.warn('Index creation warning:', error.message);
+        console.warn('⚠️ Index creation warning:', error.message);
       }
+    }
+    
+    console.log('✅ Indexes created successfully');
+  }
+
+  async verifyTables() {
+    console.log('🔍 Verifying database tables...');
+    
+    try {
+      const tables = await this.getData("SELECT name FROM sqlite_master WHERE type='table'");
+      console.log('📋 Available tables:', tables.map(t => t.name));
+      
+      // Check each required table
+      const requiredTables = ['categories', 'units', 'locations', 'suppliers', 'inventory'];
+      for (const tableName of requiredTables) {
+        const tableExists = tables.some(t => t.name === tableName);
+        if (tableExists) {
+          const count = await this.getData(`SELECT COUNT(*) as count FROM ${tableName}`);
+          console.log(`✅ Table ${tableName}: ${count[0].count} records`);
+        } else {
+          console.error(`❌ Missing table: ${tableName}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error verifying tables:', error);
     }
   }
 
@@ -219,6 +280,8 @@ class DatabaseMigrator {
       this.db.close((err) => {
         if (err) {
           console.error('Error closing database:', err);
+        } else {
+          console.log('✅ Database connection closed');
         }
         resolve();
       });
