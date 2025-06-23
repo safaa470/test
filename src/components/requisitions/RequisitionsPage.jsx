@@ -40,9 +40,13 @@ const RequisitionsPage = () => {
   const fetchRequisitions = async () => {
     try {
       const response = await axios.get('/api/requisitions');
-      setRequisitions(response.data);
+      // Ensure response.data is always an array
+      const requisitionsData = Array.isArray(response.data) ? response.data : [];
+      setRequisitions(requisitionsData);
     } catch (error) {
       toast.error('Error fetching requisitions');
+      // Set empty array on error to prevent map errors
+      setRequisitions([]);
     } finally {
       setLoading(false);
     }
@@ -58,7 +62,10 @@ const RequisitionsPage = () => {
   };
 
   const filterRequisitions = () => {
-    let filtered = requisitions.filter(req =>
+    // Ensure requisitions is always an array before filtering
+    const requisitionsArray = Array.isArray(requisitions) ? requisitions : [];
+    
+    let filtered = requisitionsArray.filter(req =>
       req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.requisition_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.requested_by_name.toLowerCase().includes(searchTerm.toLowerCase())
