@@ -1,6 +1,11 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 class DatabaseMigrator {
   constructor() {
@@ -197,4 +202,4 @@ class DatabaseMigrator {
   }
 }
 
-module.exports = DatabaseMigrator;
+export default DatabaseMigrator;
